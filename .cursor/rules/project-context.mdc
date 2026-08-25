@@ -19,6 +19,6 @@ alwaysApply: true
 - Admin 於 `/admin/users` 對照 `profiles.display_name` 手動升格 `super_member`／`admin`
 
 ## 技術棧邊界
-- Next.js App Router + PWA，部署於 Vercel（Cron：`/api/cron/tick`）
+- Next.js App Router + PWA，部署於 Vercel（Cron：`/api/cron/tick`，Hobby 為每日一次）
 - LINE Login + HttpOnly Cookie Session（30 天滑動）
 - Web Push：獨立 VAPID、單一裝置覆蓋、Fire-and-forget

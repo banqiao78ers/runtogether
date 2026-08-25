@@ -5,7 +5,7 @@
 ## 技術棧
 
 - Next.js (App Router) + PWA
-- Vercel 部署 + Cron（`/api/cron/tick` 每 15 分）
+- Vercel 部署 + Cron（`/api/cron/tick`；Hobby 限每日一次，見 `vercel.json`）
 - 共用 Supabase：`https://epmfustvktuqwppwgezt.supabase.co`（表前綴 `pwa_`）
 
 ## 上線前必做
