@@ -13,6 +13,7 @@ alwaysApply: true
 - **GitHub**：https://github.com/banqiao78ers/runtogether.git
 - **共用 Supabase**：https://epmfustvktuqwppwgezt.supabase.co
 - 新建表／RPC 一律 `pwa_` 前綴；可唯讀 `profiles` 供後台對照，禁止改既有表結構
+- **Push 帳號**：見 `.cursor/rules/git-push-account.mdc`（一律 banqiao78ers，勿用 pscase-peddy）
 
 ## 舊會員規則 C
 - `profiles` 無 `line_uid`；首次 LINE 登入一律 `member`

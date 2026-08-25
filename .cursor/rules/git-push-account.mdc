@@ -1,0 +1,28 @@
+---
+description: 本專案 GitHub / Vercel 必須使用 banqiao78ers 帳號推送
+alwaysApply: true
+---
+
+# Git Push 帳號規則（本專案專用）
+
+使用者會依專案切換不同 GitHub／Vercel 帳號。**此 repo 一律使用 `banqiao78ers`**，禁止用個人帳 `pscase-peddy` 當 commit 作者或推送身分。
+
+## 正確身分
+- **GitHub remote**：`https://github.com/banqiao78ers/runtogether.git`
+- **GitHub 操作帳號**：`banqiao78ers`（`gh auth switch --user banqiao78ers`）
+- **Commit author**（每次 commit 強制指定，勿改全域 `git config`）：
+  ```bash
+  git -c user.name="banqiao78ers" -c user.email="banqiao78ers@users.noreply.github.com" commit -m "..."
+  ```
+- **Vercel**：專案在 `banqiao78ers-projects`（帳號 banqiao78ers），不是 pscase-peddy
+
+## 禁止
+- 不要用 `aftersuntime` / `pscase2026@gmail.com` / `pscase-peddy` 當本專案 commit author（會導致 Vercel「not a member of this team」或部署失敗）
+- 不要執行 `git config --global`（或本機永久改寫）來切帳號；只用 `gh auth switch` + 單次 `-c user.name/email`
+- 本機若 `npx vercel whoami` 顯示 `pscase-peddy`，勿對此專案做 `vercel --prod`；改在 banqiao78ers 登入的 Dashboard 部署，或先 `vercel logout` 再以 banqiao78ers 登入
+
+## Push 檢查清單
+1. `gh auth switch --user banqiao78ers`
+2. commit 使用上方 `-c user.name/email`
+3. `git push origin main`
+4. 確認 GitHub commit status 的 Vercel 為 success（Hobby Cron 不可高於每日一次）
