@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 板橋約跑（runtogether）
 
-## Getting Started
+板橋跑友揪團約跑 Progressive Web App。規格見 [`banqiao_running_pwa_spec.md`](./banqiao_running_pwa_spec.md)。
 
-First, run the development server:
+## 技術棧
+
+- Next.js (App Router) + PWA
+- Vercel 部署
+- 共用 Supabase：`https://epmfustvktuqwppwgezt.supabase.co`（表前綴 `pwa_`）
+
+## 本機開發
 
 ```bash
+npm install
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 連結 Vercel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. 開啟 [Vercel New Project](https://vercel.com/new)
+2. Import GitHub repo：`banqiao78ers/runtogether`
+3. Framework Preset 選 **Next.js**（自動偵測）
+4. 在 Environment Variables 貼上 `.env.example` 對應金鑰
+5. Deploy
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+或一鍵：
 
-## Learn More
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/banqiao78ers/runtogether)
 
-To learn more about Next.js, take a look at the following resources:
+## 腳本
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| 指令 | 說明 |
+|------|------|
+| `npm run dev` | 本機開發 |
+| `npm run build` | 生產建置 |
+| `npm run start` | 啟動生產伺服器 |
+| `npm run lint` | ESLint |

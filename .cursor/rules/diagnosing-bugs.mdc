@@ -1,0 +1,17 @@
+---
+description: 遇到 Bug、系統報錯或效能問題時，強制執行嚴格的除錯流程
+globs: *
+---
+
+# Skill: /diagnosing-bugs
+
+Disciplined diagnosis loop for hard bugs and performance regressions:
+reproduce → minimise → hypothesise → instrument → fix → regression-test.
+
+Rules:
+1. NEVER guess or apply speculative fixes without evidence.
+2. Build a tight, reproducible feedback loop first (a failing test, curl script, or CLI harness) before editing implementation code.
+3. Form multiple ranked hypotheses instead of chasing the first plausible idea.
+4. Add minimal logging/instrumentation to verify hypotheses.
+5. Fix the root cause with the smallest surgical change possible.
+6. Ensure the reproduction test passes as a permanent regression test.

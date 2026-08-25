@@ -1,0 +1,15 @@
+---
+description: 掃描與優化程式碼架構，揪出過度碎片的「淺模組」，重構成高封裝度的「深模組」
+globs: *
+---
+
+# Skill: /improve-codebase-architecture
+
+Scan the codebase for architectural entropy and opportunities to deepen shallow modules into well-encapsulated, high-locality deep modules.
+
+Rules:
+1. **Locate Shallow Modules**: Scan the codebase to identify "shallow modules" — modules that expose high complexity to their callers while doing very little internal encapsulation (e.g., highly fragmented utility functions, multi-file hops for a single simple behavior).
+2. **Apply the Deletion Test**: Evaluate candidate modules by imagining their complete removal. If removing a module forces substantial unencapsulated logic back into the caller, it is a deep module doing real work. If removing it makes the codebase simpler and reduces file hops, it is an unnecessary shallow wrapper.
+3. **Generate Visual HTML Report**: Present the findings and proposed refactoring plans as a standalone, clear, and highly visual HTML report file (e.g., in `docs/architecture-report.html` or similar path in the docs folder). Show clear before-and-after structural comparisons and list the urgent architectural improvements.
+4. **Interactive Consensus**: Do NOT perform any code refactoring until the user selects a specific recommendation from the report.
+5. **Surgical Refactoring**: Once a plan is chosen, refactor surgical vertical slices towards "deep modules" — hiding internal implementation details behind a clean, simple, and testable interface.

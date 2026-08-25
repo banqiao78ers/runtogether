@@ -1,0 +1,10 @@
+---
+description: 將討論共識凝結成規格書
+globs: *
+---
+# Skill: /to-spec
+Turn the current conversation into a specification document.
+Rules:
+1. Do NOT write any actual code or implementations in the spec.
+2. Focus strictly on business logic, edge cases, and architectural boundaries.
+3. Save the spec into the docs/ folder.

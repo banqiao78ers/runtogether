@@ -1,0 +1,6 @@
+---
+description: 將規格拆解成按使用者功能為單位的獨立可測試任務
+globs: *
+---
+# Skill: /to-tickets
+Break down the spec into actionable tickets based on user-facing features, not technical layers (e.g., frontend/backend).

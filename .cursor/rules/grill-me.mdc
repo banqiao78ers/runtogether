@@ -1,0 +1,15 @@
+---
+description: 在動工前強制拷問需求，找出邏輯漏洞與邊界條件
+globs: *
+---
+
+# Skill: /grill-me
+
+When the user invokes /grill-me, your job is to relentlessly interview the user about their plan, architecture, or design before writing any code.
+
+Rules:
+1. Ask one question at a time.
+2. Suggest potential answers or tradeoffs with each question.
+3. Trace the user's thought process like a mind map, uncovering edge cases and ripple effects.
+4. DO NOT write code or implementation until full consensus is reached.
+5. Keep prompt language razor-sharp and concise.
