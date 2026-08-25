@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "板橋約跑",
-    short_name: "板橋約跑",
-    description: "板橋跑友揪團約跑 PWA",
+    name: "Banqiao Run",
+    short_name: "BanqiaoRun",
+    description: "Banqiao running club PWA",
     start_url: "/",
     display: "standalone",
     background_color: "#0f1f17",

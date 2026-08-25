@@ -1,0 +1,274 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import useSWR from "swr";
+import { formatDateTime, paceLabel } from "@/lib/format";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+export default function RunDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { data, mutate, isLoading } = useSWR(
+    id ? `/api/runs/${id}` : null,
+    fetcher,
+    { refreshInterval: 10000 },
+  );
+  const [msg, setMsg] = useState<string | null>(null);
+  const [comment, setComment] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [delayMins, setDelayMins] = useState(10);
+
+  const run = data?.run;
+  const me = data?.me;
+
+  async function act(path: string, body?: unknown) {
+    setMsg(null);
+    const res = await fetch(`/api/runs/${id}/${path}`, {
+      method: "POST",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMsg(json.error || "操作失敗");
+      return;
+    }
+    await mutate();
+    if (path === "cancel" && json.voting_enabled) {
+      setMsg("活動已取消。若認為惡意取消，可投票檢舉。");
+    }
+  }
+
+  async function sendComment() {
+    const res = await fetch(`/api/runs/${id}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: comment }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setMsg(j.error || "留言失敗");
+      return;
+    }
+    setComment("");
+    await mutate();
+  }
+
+  if (isLoading || !run) {
+    return (
+      <main className="px-5 py-10 text-sm text-emerald-100/50">載入中…</main>
+    );
+  }
+
+  const place =
+    run.custom_location ||
+    (run.location
+      ? `${run.location.city}${run.location.district} ${run.location.title}`
+      : "—");
+  const full = data.participant_count >= run.max_participants;
+  const isHost = me?.is_host;
+  const joined = !!me?.participation;
+  const closed = ["completed", "cancelled"].includes(run.status);
+
+  return (
+    <main className="px-5 py-8">
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="text-sm text-emerald-300/70"
+      >
+        ← 返回
+      </button>
+
+      <h1 className="mt-4 text-2xl font-bold text-white">
+        {formatDateTime(run.start_time)}
+      </h1>
+      <p className="mt-2 text-emerald-100/80">{place}</p>
+      {run.location_detail && (
+        <p className="text-sm text-emerald-100/50">{run.location_detail}</p>
+      )}
+
+      <dl className="mt-6 grid grid-cols-2 gap-3 text-sm text-emerald-100/70">
+        <div>
+          <dt className="text-emerald-100/40">距離</dt>
+          <dd>{run.distance_km} km</dd>
+        </div>
+        <div>
+          <dt className="text-emerald-100/40">配速</dt>
+          <dd>
+            {paceLabel(run.pace_min)}–{paceLabel(run.pace_max)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-emerald-100/40">名額</dt>
+          <dd>
+            {data.participant_count}/{run.max_participants}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-emerald-100/40">狀態</dt>
+          <dd>{run.status}</dd>
+        </div>
+      </dl>
+
+      {run.note && (
+        <p className="mt-4 text-sm text-emerald-100/60">{run.note}</p>
+      )}
+      {run.cancel_reason && (
+        <p className="mt-4 text-sm text-amber-300">取消原因：{run.cancel_reason}</p>
+      )}
+
+      {msg && <p className="mt-4 text-sm text-amber-300">{msg}</p>}
+
+      <div className="mt-6 flex flex-col gap-2">
+        {!closed && me && !isHost && !joined && (
+          <button
+            type="button"
+            disabled={full}
+            onClick={() => void act("register")}
+            className="h-11 rounded-lg bg-emerald-400 font-semibold text-emerald-950 disabled:opacity-40"
+          >
+            {full ? "已額滿" : "報名"}
+          </button>
+        )}
+        {!closed && me && !isHost && joined && (
+          <>
+            <button
+              type="button"
+              onClick={() => void act("arrive")}
+              className="h-11 rounded-lg border border-emerald-500/40 text-emerald-200"
+            >
+              我已到達
+            </button>
+            <button
+              type="button"
+              onClick={() => void act("cancel-registration")}
+              className="h-11 text-sm text-emerald-100/50"
+            >
+              取消報名
+            </button>
+          </>
+        )}
+
+        {isHost && !closed && (
+          <>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={delayMins}
+                onChange={(e) => setDelayMins(Number(e.target.value))}
+                className="w-24 rounded-md border border-emerald-800/60 bg-transparent px-2 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => void act("delay", { minutes: delayMins })}
+                className="flex-1 rounded-lg border border-emerald-500/40 py-2 text-sm text-emerald-200"
+              >
+                延期廣播
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => void act("complete", {})}
+              className="h-11 rounded-lg bg-emerald-400 font-semibold text-emerald-950"
+            >
+              結案點名
+            </button>
+            <input
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="取消整場原因"
+              className="rounded-md border border-emerald-800/60 bg-transparent px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => void act("cancel", { reason: cancelReason })}
+              className="h-11 text-sm text-rose-300/80"
+            >
+              取消整場活動
+            </button>
+          </>
+        )}
+
+        {run.status === "cancelled" && me && !isHost && (
+          <button
+            type="button"
+            onClick={() => void act("vote-cancel", { is_malicious: true })}
+            className="h-11 rounded-lg border border-rose-400/40 text-rose-200"
+          >
+            投票：惡意取消
+          </button>
+        )}
+
+        {!me && (
+          <a
+            href="/login"
+            className="flex h-11 items-center justify-center rounded-lg bg-emerald-400 font-semibold text-emerald-950"
+          >
+            登入後報名
+          </a>
+        )}
+      </div>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-medium text-emerald-200/80">
+          報名者（{data.participant_count}）
+        </h2>
+        <ul className="mt-3 space-y-2">
+          {(data.participants ?? []).map(
+            (p: {
+              id: string;
+              status: string;
+              user?: { display_name: string };
+            }) => (
+              <li key={p.id} className="text-sm text-emerald-100/70">
+                {p.user?.display_name || "跑友"} · {p.status}
+              </li>
+            ),
+          )}
+        </ul>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-medium text-emerald-200/80">留言板</h2>
+        <ul className="mt-3 space-y-3">
+          {(data.comments ?? []).map(
+            (c: {
+              id: string;
+              content: string;
+              user?: { display_name: string };
+            }) => (
+              <li key={c.id} className="border-b border-emerald-900/40 pb-2 text-sm">
+                <span className="text-emerald-300/70">
+                  {c.user?.display_name}
+                </span>
+                <p className="text-emerald-100/80">{c.content}</p>
+              </li>
+            ),
+          )}
+        </ul>
+        {me && (isHost || joined) && (
+          <div className="mt-4 flex gap-2">
+            <input
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="flex-1 rounded-md border border-emerald-800/60 bg-transparent px-3 py-2 text-sm"
+              placeholder="留言（5 秒冷卻）"
+            />
+            <button
+              type="button"
+              onClick={() => void sendComment()}
+              className="rounded-md bg-emerald-500/20 px-3 text-sm text-emerald-200"
+            >
+              送出
+            </button>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}

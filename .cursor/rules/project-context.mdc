@@ -6,18 +6,19 @@ alwaysApply: true
 # 板橋約跑 PWA — 專案環境
 
 ## 權威規格
-- 唯一技術基準：`banqiao_running_pwa_spec.md`（PRD + System Architecture）
-- 實作前以該規格為準；勿擅自偏離隔離原則與業務防呆邏輯
+- 唯一技術基準：`banqiao_running_pwa_spec.md`
+- Schema migration：`supabase/migrations/001_pwa_schema.sql`
 
 ## 遠端與基礎設施
 - **GitHub**：https://github.com/banqiao78ers/runtogether.git
 - **共用 Supabase**：https://epmfustvktuqwppwgezt.supabase.co
-- 與既有系統共用同一 Supabase 實體；本專案新建表／觸發器／視圖一律 `pwa_` 前綴，禁止改動既有系統表結構
+- 新建表／RPC 一律 `pwa_` 前綴；可唯讀 `profiles` 供後台對照，禁止改既有表結構
+
+## 舊會員規則 C
+- `profiles` 無 `line_uid`；首次 LINE 登入一律 `member`
+- Admin 於 `/admin/users` 對照 `profiles.display_name` 手動升格 `super_member`／`admin`
 
 ## 技術棧邊界
-- Next.js App Router + PWA，部署於 Vercel
-- LINE Login（同 Provider 下獨立 Channel）、長效 HttpOnly Cookie Session（30 天滑動）
-- Web Push：獨立 VAPID、單一裝置覆蓋、Fire-and-forget 發送
-
-## 核心資料表（皆 `pwa_`）
-`pwa_users` · `pwa_locations` · `pwa_runs` · `pwa_run_participants` · `pwa_run_comments` · `pwa_host_blocklists` · `pwa_run_cancellation_votes` · `pwa_penalty_appeals`
+- Next.js App Router + PWA，部署於 Vercel（Cron：`/api/cron/tick`）
+- LINE Login + HttpOnly Cookie Session（30 天滑動）
+- Web Push：獨立 VAPID、單一裝置覆蓋、Fire-and-forget

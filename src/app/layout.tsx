@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_TC } from "next/font/google";
+import { BottomNav } from "@/components/BottomNav";
 import "./globals.css";
 
 const notoSansTc = Noto_Sans_TC({
@@ -36,7 +37,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="zh-Hant" className={`${notoSansTc.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <div className="mx-auto flex w-full max-w-lg flex-1 flex-col pb-16">
+          {children}
+        </div>
+        <BottomNav />
+      </body>
     </html>
   );
 }
