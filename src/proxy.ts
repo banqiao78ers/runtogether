@@ -15,14 +15,13 @@ function isPublicPath(pathname: string, method: string): boolean {
   if (method === "GET" && /^\/api\/runs\/[^/]+$/.test(pathname)) return true;
   if (method === "GET" && pathname === "/api/locations") return true;
   if (pathname === "/" || pathname.startsWith("/runs/")) {
-    // run detail/list pages are viewable; /runs/new needs auth (handled below)
     if (pathname === "/runs/new") return false;
     return true;
   }
   return false;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
 
