@@ -15,8 +15,15 @@ function isIosDevice() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
   const iOS = /iPad|iPhone|iPod/.test(ua);
-  const iPadOs = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  const iPadOs =
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
+    (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   return iOS || iPadOs;
+}
+
+function isAndroidDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent);
 }
 
 function isStandaloneDisplay() {
@@ -34,6 +41,8 @@ function isInAppBrowser() {
   return /Line\//i.test(ua) || /FBAN|FBAV/i.test(ua) || /Instagram/i.test(ua);
 }
 
+type DeviceKind = "ios" | "android" | "desktop";
+
 type Props = {
   guideOnly?: boolean;
 };
@@ -42,14 +51,16 @@ export function PushRegister({ guideOnly = false }: Props) {
   const [status, setStatus] = useState<"idle" | "on" | "off" | "unsupported">(
     "idle",
   );
-  const [ios, setIos] = useState(false);
+  const [device, setDevice] = useState<DeviceKind>("desktop");
   const [standalone, setStandalone] = useState(false);
   const [inApp, setInApp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setIos(isIosDevice());
+    const ios = isIosDevice();
+    const android = isAndroidDevice();
+    setDevice(ios ? "ios" : android ? "android" : "desktop");
     setStandalone(isStandaloneDisplay());
     setInApp(isInAppBrowser());
 
@@ -74,7 +85,9 @@ export function PushRegister({ guideOnly = false }: Props) {
     setBusy(true);
     try {
       if (inApp) {
-        setError("請用系統瀏覽器開啟（Chrome 或 Safari），LINE 內建瀏覽器無法開啟推播");
+        setError(
+          "請用系統瀏覽器開啟（Chrome 或 Safari），LINE 內建瀏覽器無法開啟推播",
+        );
         return;
       }
 
@@ -175,10 +188,16 @@ export function PushRegister({ guideOnly = false }: Props) {
   }
 
   const canEnablePush = status === "on" || status === "off";
-  const iosNeedsInstall = ios && !standalone;
+  const iosNeedsInstall = device === "ios" && !standalone;
+  const deviceLabel =
+    device === "ios"
+      ? "目前裝置：iPhone／iPad"
+      : device === "android"
+        ? "目前裝置：Android"
+        : "目前裝置：電腦";
 
   return (
-    <div className="relative z-10 space-y-3 rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-4 py-4 text-sm text-emerald-100/70">
+    <div className="relative z-10 space-y-4 rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-4 py-4 text-sm text-emerald-100/70">
       <div className="flex items-center justify-between gap-2">
         <p className="font-medium text-emerald-100/90">推播通知</p>
         {!guideOnly && canEnablePush && (
@@ -192,6 +211,8 @@ export function PushRegister({ guideOnly = false }: Props) {
         )}
       </div>
 
+      <p className="text-xs text-emerald-300/80">{deviceLabel}</p>
+
       {inApp && (
         <p className="rounded-md bg-amber-400/10 px-3 py-2 text-amber-200">
           偵測到 App 內建瀏覽器。請用右上角選單「在瀏覽器開啟」，再用
@@ -199,39 +220,61 @@ export function PushRegister({ guideOnly = false }: Props) {
         </p>
       )}
 
-      {ios ? (
-        <div className="space-y-2">
-          <p className="font-medium text-emerald-200/90">iPhone／iPad 設定步驟</p>
+      {/* 兩個平台教學都顯示，目前裝置那塊較醒目 */}
+      <div
+        className={`space-y-2 rounded-md px-3 py-3 ${
+          device === "ios"
+            ? "border border-emerald-400/40 bg-emerald-400/10"
+            : "border border-emerald-900/50 bg-black/20"
+        }`}
+      >
+        <p className="font-medium text-emerald-200/90">
+          iPhone／iPad 設定
+          {device === "ios" ? "（你的裝置）" : ""}
+        </p>
+        <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
+          <li>請用 Safari 開啟本站（勿用 LINE 內建瀏覽器）</li>
+          <li>系統需 iOS 16.4 或更新版本</li>
+          <li>點底部分享按鈕 → 選擇「加入主畫面」</li>
+          <li>從主畫面圖示開啟 App（不是 Safari 分頁）</li>
+          <li>到「我的」點「開啟推播通知」並允許</li>
+        </ol>
+        {device === "ios" && iosNeedsInstall && (
+          <p className="text-amber-200/90">
+            目前還在瀏覽器分頁中。請先加入主畫面，否則無法收到推播。
+          </p>
+        )}
+      </div>
+
+      <div
+        className={`space-y-2 rounded-md px-3 py-3 ${
+          device !== "ios"
+            ? "border border-emerald-400/40 bg-emerald-400/10"
+            : "border border-emerald-900/50 bg-black/20"
+        }`}
+      >
+        <p className="font-medium text-emerald-200/90">
+          Android／電腦 設定
+          {device !== "ios" ? "（你的裝置）" : ""}
+        </p>
+        {status === "unsupported" && device !== "ios" ? (
+          <p className="text-emerald-100/65">
+            此瀏覽器不支援網頁推播。請改用 Chrome 開啟本站後再試。
+          </p>
+        ) : (
           <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
-            <li>請用 Safari 開啟本站（勿用 LINE 內建瀏覽器）</li>
-            <li>系統需 iOS 16.4 或更新版本</li>
-            <li>點底部分享按鈕 → 選擇「加入主畫面」</li>
-            <li>從主畫面圖示開啟 App（不是 Safari 分頁）</li>
-            <li>到「我的」點「開啟推播通知」並允許</li>
+            <li>建議使用 Chrome 開啟本站</li>
+            <li>點下方「開啟推播通知」並允許通知</li>
+            <li>（選用）可「加入主畫面」方便之後開啟</li>
           </ol>
-          {iosNeedsInstall ? (
-            <p className="text-amber-200/90">
-              目前還在瀏覽器分頁中。請先加入主畫面，否則 iPhone
-              無法收到推播。
-            </p>
-          ) : (
-            <p className="text-emerald-100/60">
-              已從主畫面開啟。請點下方按鈕並允許通知。
-            </p>
-          )}
-        </div>
-      ) : status === "unsupported" ? (
-        <p className="text-emerald-100/60">
-          此瀏覽器不支援網頁推播。請改用 Android 的 Chrome，或將網站加入主畫面後再開啟。
-        </p>
-      ) : (
-        <p className="text-emerald-100/60">
-          Android 或電腦版 Chrome：直接點下方按鈕並允許通知即可。
-        </p>
-      )}
+        )}
+      </div>
 
       {error && (
-        <p className="rounded-md bg-amber-400/10 px-3 py-2 text-amber-200" role="alert">
+        <p
+          className="rounded-md bg-amber-400/10 px-3 py-2 text-amber-200"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -253,6 +296,12 @@ export function PushRegister({ guideOnly = false }: Props) {
               ? "關閉推播"
               : "開啟推播通知"}
         </button>
+      )}
+
+      {!guideOnly && iosNeedsInstall && (
+        <p className="text-amber-200/90">
+          iPhone／iPad 請先完成「加入主畫面」後，開啟按鈕才會出現。
+        </p>
       )}
 
       {!guideOnly && (
