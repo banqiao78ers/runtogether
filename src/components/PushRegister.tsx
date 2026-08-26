@@ -259,7 +259,10 @@ export function PushRegister({ guideOnly = false }: Props) {
         <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
           <li>請用 Safari 開啟本站（勿用 LINE 內建瀏覽器）</li>
           <li>系統需 iOS 16.4 或更新版本</li>
-          <li>點底部分享按鈕 → 選擇「加入主畫面」</li>
+          <li>
+            點底部分享按鈕（方框＋向上箭頭）→ 往下找「加入主畫面」
+            （若沒有，點「編輯動作」開啟）
+          </li>
           <li>從主畫面圖示開啟 App（不是 Safari 分頁）</li>
           <li>到「我的」點「開啟推播通知」並允許</li>
         </ol>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { PushRegister } from "@/components/PushRegister";
+import { InstallApp } from "@/components/InstallApp";
 import { paceLabel, roleLabel } from "@/lib/format";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -57,7 +58,8 @@ export default function MePage() {
         </div>
       </dl>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-4">
+        <InstallApp />
         <PushRegister />
       </div>
 

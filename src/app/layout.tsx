@@ -34,6 +34,10 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "板橋約跑",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+  },
   formatDetection: {
     telephone: false,
   },
