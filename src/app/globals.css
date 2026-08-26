@@ -9,9 +9,20 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-noto-sans-tc), "Noto Sans TC", sans-serif;
+  /* 全站字級 +2pt（相對 Tailwind 預設 rem） */
+  --text-xs: calc(0.75rem + 2pt);
+  --text-sm: calc(0.875rem + 2pt);
+  --text-base: calc(1rem + 2pt);
+  --text-lg: calc(1.125rem + 2pt);
+  --text-xl: calc(1.25rem + 2pt);
+  --text-2xl: calc(1.5rem + 2pt);
+  --text-3xl: calc(1.875rem + 2pt);
+  --text-4xl: calc(2.25rem + 2pt);
+  --text-5xl: calc(3rem + 2pt);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-size: calc(1rem + 2pt);
 }
