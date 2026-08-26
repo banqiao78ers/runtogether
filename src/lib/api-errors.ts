@@ -46,6 +46,7 @@ const API_ERROR_ZH: Record<string, string> = {
   RUN_NOT_FOUND: "找不到活動",
   VAPID_NOT_CONFIGURED: "伺服器尚未設定推播金鑰，請聯絡管理員",
   VAPID_INVALID: "伺服器推播金鑰格式錯誤，請聯絡管理員",
+  SELF_NO_PUSH: "你尚未開啟推播，請先到「我的」開啟後再測試",
 };
 
 export function apiErrorMessage(code: unknown, fallback = "操作失敗"): string {

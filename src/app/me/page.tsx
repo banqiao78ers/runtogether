@@ -86,6 +86,11 @@ export default function MePage() {
                 審核停權申訴
               </Link>
             </li>
+            <li>
+              <Link href="/admin/push" className="text-emerald-300">
+                推播測試
+              </Link>
+            </li>
           </>
         )}
         <li>

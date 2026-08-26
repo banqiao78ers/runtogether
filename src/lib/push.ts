@@ -171,6 +171,70 @@ export function notifyUsers(userIds: string[], payload: PushPayload): void {
   })();
 }
 
+export type BroadcastPushResult = {
+  total: number;
+  sent: number;
+  failed: number;
+  expired: number;
+  errors: string[];
+};
+
+/** 管理員測試用：同步發送並回傳統計 */
+export async function broadcastPush(
+  payload: PushPayload,
+  options?: { onlyUserId?: string },
+): Promise<BroadcastPushResult> {
+  ensureVapid();
+  const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from("pwa_users")
+    .select("id, push_subscription, display_name")
+    .not("push_subscription", "is", null)
+    .eq("is_banned", false);
+
+  if (options?.onlyUserId) {
+    query = query.eq("id", options.onlyUserId);
+  }
+
+  const { data: users, error } = await query;
+  if (error) throw new Error("DB");
+
+  const result: BroadcastPushResult = {
+    total: users?.length ?? 0,
+    sent: 0,
+    failed: 0,
+    expired: 0,
+    errors: [],
+  };
+
+  for (const u of users ?? []) {
+    try {
+      await webpush.sendNotification(
+        u.push_subscription as PushSubscriptionJSON,
+        JSON.stringify(payload),
+      );
+      result.sent += 1;
+    } catch (err: unknown) {
+      const status = (err as { statusCode?: number })?.statusCode;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (status === 410) {
+        result.expired += 1;
+        await supabase
+          .from("pwa_users")
+          .update({ push_subscription: null })
+          .eq("id", u.id);
+      } else {
+        result.failed += 1;
+        if (result.errors.length < 5) {
+          result.errors.push(`${u.display_name}: ${msg}`);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 const BACKFILL_LIMIT = 5;
 
 /**
