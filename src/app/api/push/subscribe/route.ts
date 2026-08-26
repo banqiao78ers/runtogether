@@ -1,6 +1,7 @@
 import { jsonOk, jsonError, handleRouteError } from "@/lib/api";
 import { requireUser } from "@/lib/auth/user";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { notifyOpenRunsMatchingUser } from "@/lib/push";
 import type { PushSubscriptionJSON } from "@/types/database";
 
 export async function POST(request: Request) {
@@ -16,6 +17,9 @@ export async function POST(request: Request) {
       .from("pwa_users")
       .update({ push_subscription: body.subscription })
       .eq("id", user.id);
+
+    // 剛開啟推播：若已有配速，補推目前開放中的同配速團
+    notifyOpenRunsMatchingUser(user.id);
 
     return jsonOk({ ok: true });
   } catch (err) {

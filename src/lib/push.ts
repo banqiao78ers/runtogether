@@ -170,3 +170,95 @@ export function notifyUsers(userIds: string[], payload: PushPayload): void {
     }
   })();
 }
+
+const BACKFILL_LIMIT = 5;
+
+/**
+ * 新設配速或剛開啟推播時，補推目前仍開放且配速重疊的約跑（最多 5 場）。
+ * Fire-and-forget。
+ */
+export function notifyOpenRunsMatchingUser(userId: string): void {
+  void (async () => {
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data: user } = await supabase
+        .from("pwa_users")
+        .select("id, pace_min, pace_max, push_subscription, is_banned")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (
+        !user ||
+        user.is_banned ||
+        !user.push_subscription ||
+        user.pace_min == null ||
+        user.pace_max == null
+      ) {
+        return;
+      }
+
+      const { data: runs } = await supabase
+        .from("pwa_runs")
+        .select(
+          "id, host_id, pace_min, pace_max, start_time, host:pwa_users!host_id(display_name)",
+        )
+        .in("status", ["open", "delayed"])
+        .is("deleted_at", null)
+        .gt("start_time", new Date().toISOString())
+        .neq("host_id", userId)
+        .order("start_time", { ascending: true })
+        .limit(40);
+
+      const matching = (runs ?? []).filter(
+        (r) =>
+          user.pace_min! <= r.pace_max && user.pace_max! >= r.pace_min,
+      );
+
+      if (matching.length === 0) return;
+
+      const runIds = matching.map((r) => r.id);
+      const { data: parts } = await supabase
+        .from("pwa_run_participants")
+        .select("run_id")
+        .eq("user_id", userId)
+        .in("run_id", runIds)
+        .in("status", ["registered", "arrived", "attended"]);
+
+      const alreadyIn = new Set((parts ?? []).map((p) => p.run_id));
+      const targets = matching
+        .filter((r) => !alreadyIn.has(r.id))
+        .slice(0, BACKFILL_LIMIT);
+
+      const sub = user.push_subscription as PushSubscriptionJSON;
+
+      if (targets.length === 1) {
+        const r = targets[0];
+        const host = r.host as { display_name?: string } | null;
+        await sendPushToSubscription(
+          sub,
+          {
+            title: "有符合配速的約跑",
+            body: `${host?.display_name || "跑友"} · ${formatDateTime(r.start_time)} · ${paceLabel(r.pace_min)}–${paceLabel(r.pace_max)}`,
+            url: `/runs/${r.id}`,
+          },
+          userId,
+        );
+        return;
+      }
+
+      if (targets.length > 1) {
+        await sendPushToSubscription(
+          sub,
+          {
+            title: "有符合配速的約跑",
+            body: `目前有 ${targets.length} 場開放中，點擊查看列表`,
+            url: "/",
+          },
+          userId,
+        );
+      }
+    } catch {
+      // swallow
+    }
+  })();
+}

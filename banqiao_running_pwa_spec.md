@@ -57,6 +57,8 @@
   採用嚴格區間交集（Overlap Algorithm）匹配推播受眾：
   `pwa_users.pace_min <= run.pace_max AND pwa_users.pace_max >= run.pace_min`
   （自動排除主揪本人與已關閉通知之用戶）。
+* **追蹤主揪**：用戶可追蹤特定主揪（`pwa_host_follows`）。追蹤者收到該主揪開團推播時**略過配速過濾**（仍須已開啟 Web Push），與配速匹配受眾取聯集後發送。
+* **新成員補推**：用戶**首次設定配速**或**剛開啟推播**時，背景掃描目前仍開放（`open`/`delayed`）且配速重疊、尚未報名的活動；有 1 場則推該團詳情，多場則推摘要導向首頁（最多計入 5 場）。
 * **開跑前提醒排程**：定時任務依剩餘時間門檻，向已報名者發送開跑提醒（各送一次）：
   * 一天前：`start_time - now ≤ 24h` 且尚未進入六小時內 → `reminder_1d_sent_at`
   * 六小時前：`≤ 6h` → `reminder_6h_sent_at`
