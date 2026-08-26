@@ -28,8 +28,13 @@ function isStandaloneDisplay() {
   return mq || iosStandalone;
 }
 
+function isInAppBrowser() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /Line\//i.test(ua) || /FBAN|FBAV/i.test(ua) || /Instagram/i.test(ua);
+}
+
 type Props = {
-  /** 精簡版：用在配速設定等頁，只顯示教學 */
   guideOnly?: boolean;
 };
 
@@ -39,53 +44,125 @@ export function PushRegister({ guideOnly = false }: Props) {
   );
   const [ios, setIos] = useState(false);
   const [standalone, setStandalone] = useState(false);
+  const [inApp, setInApp] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setIos(isIosDevice());
     setStandalone(isStandaloneDisplay());
+    setInApp(isInAppBrowser());
 
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       setStatus("unsupported");
       return;
     }
-    void navigator.serviceWorker.register("/sw.js").then(async (reg) => {
-      const sub = await reg.pushManager.getSubscription();
-      setStatus(sub ? "on" : "off");
-    });
+    void navigator.serviceWorker
+      .register("/sw.js")
+      .then(async (reg) => {
+        const sub = await reg.pushManager.getSubscription();
+        setStatus(sub ? "on" : "off");
+      })
+      .catch(() => {
+        setStatus("unsupported");
+        setError("無法註冊背景服務，請改用 Chrome／Safari 重新開啟");
+      });
   }, []);
 
   async function enable() {
-    const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!key) {
-      alert("尚未設定推播金鑰，請聯絡管理員");
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      alert("需要允許通知才能收到開團推播");
-      return;
-    }
+    setError(null);
+    setBusy(true);
+    try {
+      if (inApp) {
+        setError("請用系統瀏覽器開啟（Chrome 或 Safari），LINE 內建瀏覽器無法開啟推播");
+        return;
+      }
 
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(key),
-    });
+      const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!key) {
+        setError("尚未設定推播金鑰，請聯絡管理員");
+        return;
+      }
 
-    await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription: sub.toJSON() }),
-    });
-    setStatus("on");
+      if (!window.isSecureContext) {
+        setError("需在安全連線（HTTPS）下才能開啟推播");
+        return;
+      }
+
+      if (!("Notification" in window)) {
+        setError("此瀏覽器不支援通知");
+        return;
+      }
+
+      if (Notification.permission === "denied") {
+        setError(
+          "瀏覽器已封鎖通知。請到瀏覽器網站設定中允許「通知」，再重新整理此頁",
+        );
+        return;
+      }
+
+      const permission =
+        Notification.permission === "granted"
+          ? "granted"
+          : await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        setError("需要允許通知才能收到開團推播");
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(
+          j.error === "UNAUTHORIZED"
+            ? "登入已過期，請重新登入後再試"
+            : "推播訂閱儲存失敗，請稍後再試",
+        );
+        return;
+      }
+      setStatus("on");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/denied|not allowed/i.test(msg)) {
+        setError("通知權限被拒絕，請在瀏覽器設定允許後重試");
+      } else {
+        setError(`開啟失敗：${msg || "未知錯誤"}`);
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function disable() {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (sub) await sub.unsubscribe();
-    await fetch("/api/push/subscribe", { method: "DELETE" });
-    setStatus("off");
+    setError(null);
+    setBusy(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+      await fetch("/api/push/subscribe", {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      setStatus("off");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`關閉失敗：${msg || "未知錯誤"}`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (status === "idle") {
@@ -101,7 +178,7 @@ export function PushRegister({ guideOnly = false }: Props) {
   const iosNeedsInstall = ios && !standalone;
 
   return (
-    <div className="space-y-3 rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-4 py-4 text-sm text-emerald-100/70">
+    <div className="relative z-10 space-y-3 rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-4 py-4 text-sm text-emerald-100/70">
       <div className="flex items-center justify-between gap-2">
         <p className="font-medium text-emerald-100/90">推播通知</p>
         {!guideOnly && canEnablePush && (
@@ -114,6 +191,13 @@ export function PushRegister({ guideOnly = false }: Props) {
           </span>
         )}
       </div>
+
+      {inApp && (
+        <p className="rounded-md bg-amber-400/10 px-3 py-2 text-amber-200">
+          偵測到 App 內建瀏覽器。請用右上角選單「在瀏覽器開啟」，再用
+          Chrome／Safari 操作推播。
+        </p>
+      )}
 
       {ios ? (
         <div className="space-y-2">
@@ -146,13 +230,28 @@ export function PushRegister({ guideOnly = false }: Props) {
         </p>
       )}
 
+      {error && (
+        <p className="rounded-md bg-amber-400/10 px-3 py-2 text-amber-200" role="alert">
+          {error}
+        </p>
+      )}
+
       {!guideOnly && canEnablePush && !iosNeedsInstall && (
         <button
           type="button"
-          onClick={() => void (status === "on" ? disable() : enable())}
-          className="h-10 w-full rounded-md bg-emerald-400/90 font-semibold text-emerald-950"
+          disabled={busy || inApp}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void (status === "on" ? disable() : enable());
+          }}
+          className="relative z-10 h-11 w-full cursor-pointer touch-manipulation rounded-md bg-emerald-400 font-semibold text-emerald-950 active:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {status === "on" ? "關閉推播" : "開啟推播通知"}
+          {busy
+            ? "處理中…"
+            : status === "on"
+              ? "關閉推播"
+              : "開啟推播通知"}
         </button>
       )}
 
