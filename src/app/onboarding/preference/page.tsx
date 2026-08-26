@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PushRegister } from "@/components/PushRegister";
+import { InstallApp } from "@/components/InstallApp";
 import { apiErrorMessage } from "@/lib/api-errors";
 
 const PRESETS = [
@@ -16,14 +17,15 @@ const PRESETS = [
 
 export default function PreferencePage() {
   const router = useRouter();
-  // 預設 5:00–6:00（對應既有 pace 300–360）
   const [selected, setSelected] = useState<Set<number>>(() => new Set([1, 2]));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState<"form" | "push">("form");
 
-  // 隱藏計算：多選區間取包絡，供 API／推播篩選使用
   const { paceMin, paceMax } = useMemo(() => {
-    if (selected.size === 0) return { paceMin: null as number | null, paceMax: null as number | null };
+    if (selected.size === 0) {
+      return { paceMin: null as number | null, paceMax: null as number | null };
+    }
     let min = Infinity;
     let max = -Infinity;
     for (const i of selected) {
@@ -60,15 +62,62 @@ export default function PreferencePage() {
       setError(apiErrorMessage(j.error, "儲存失敗"));
       return;
     }
+    setPhase("push");
+  }
+
+  function finish() {
     router.replace("/");
     router.refresh();
   }
 
+  if (phase === "push") {
+    return (
+      <main className="flex flex-1 flex-col px-6 py-10">
+        <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-6">
+          <p className="text-xs font-medium tracking-wide text-emerald-300/80">
+            步驟 2／2
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-white">配速已儲存</h1>
+          <p className="mt-3 text-sm leading-relaxed text-emerald-100/75">
+            接下來請<strong className="text-emerald-100">開啟推播通知</strong>
+            ，才收得到符合你配速的開團提醒。多數人會漏這一步，所以請現在設定。
+          </p>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <InstallApp />
+          <PushRegister />
+        </div>
+
+        <button
+          type="button"
+          onClick={finish}
+          className="mt-8 h-12 rounded-lg border border-emerald-700/60 text-emerald-100/70"
+        >
+          稍後再設定，先進首頁
+        </button>
+        <button
+          type="button"
+          onClick={finish}
+          className="mt-3 h-12 rounded-lg bg-emerald-400 font-semibold text-emerald-950"
+        >
+          已完成推播設定
+        </button>
+      </main>
+    );
+  }
+
   return (
     <main className="flex flex-1 flex-col px-6 py-12">
-      <h1 className="text-2xl font-bold text-white">設定配速偏好</h1>
+      <p className="text-xs font-medium tracking-wide text-emerald-300/80">
+        步驟 1／2
+      </p>
+      <h1 className="mt-2 text-2xl font-bold text-white">設定配速偏好</h1>
       <p className="mt-2 text-sm text-emerald-100/60">
         可複選多個區間，之後開團推播會依此匹配。單位：分鐘／公里。
+      </p>
+      <p className="mt-3 rounded-md bg-emerald-950/50 px-3 py-2 text-xs text-emerald-100/55">
+        儲存配速後，下一步會引導你開啟推播通知。
       </p>
 
       <div className="mt-8 flex flex-wrap gap-2">
@@ -94,17 +143,13 @@ export default function PreferencePage() {
 
       {error && <p className="mt-4 text-sm text-amber-300">{error}</p>}
 
-      <div className="mt-8">
-        <PushRegister guideOnly />
-      </div>
-
       <button
         type="button"
         disabled={loading || paceMin == null}
         onClick={() => void submit()}
-        className="mt-8 h-12 rounded-lg bg-emerald-400 font-semibold text-emerald-950 disabled:opacity-60"
+        className="mt-10 h-12 rounded-lg bg-emerald-400 font-semibold text-emerald-950 disabled:opacity-60"
       >
-        {loading ? "儲存中…" : "完成"}
+        {loading ? "儲存中…" : "下一步：設定推播"}
       </button>
     </main>
   );
