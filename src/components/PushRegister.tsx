@@ -28,7 +28,12 @@ function isStandaloneDisplay() {
   return mq || iosStandalone;
 }
 
-export function PushRegister() {
+type Props = {
+  /** 精簡版：用在配速設定等頁，只顯示教學 */
+  guideOnly?: boolean;
+};
+
+export function PushRegister({ guideOnly = false }: Props) {
   const [status, setStatus] = useState<"idle" | "on" | "off" | "unsupported">(
     "idle",
   );
@@ -56,7 +61,10 @@ export function PushRegister() {
       return;
     }
     const permission = await Notification.requestPermission();
-    if (permission !== "granted") return;
+    if (permission !== "granted") {
+      alert("需要允許通知才能收到開團推播");
+      return;
+    }
 
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({
@@ -80,47 +88,78 @@ export function PushRegister() {
     setStatus("off");
   }
 
-  if (status === "idle") return null;
+  if (status === "idle") {
+    return (
+      <div className="space-y-2 text-sm text-emerald-100/50">
+        <p className="font-medium text-emerald-100/90">推播通知</p>
+        <p>檢查裝置中…</p>
+      </div>
+    );
+  }
 
   const canEnablePush = status === "on" || status === "off";
   const iosNeedsInstall = ios && !standalone;
 
   return (
-    <div className="space-y-3 text-sm text-emerald-100/70">
-      <p className="font-medium text-emerald-100/90">推播通知</p>
+    <div className="space-y-3 rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-4 py-4 text-sm text-emerald-100/70">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium text-emerald-100/90">推播通知</p>
+        {!guideOnly && canEnablePush && (
+          <span
+            className={
+              status === "on" ? "text-emerald-300" : "text-amber-200/80"
+            }
+          >
+            {status === "on" ? "已開啟" : "未開啟"}
+          </span>
+        )}
+      </div>
 
-      {iosNeedsInstall ? (
-        <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/60">
-          <li>使用 Safari 開啟本站（需 iOS 16.4 以上）</li>
-          <li>點底部分享 →「加入主畫面」</li>
-          <li>從主畫面圖示開啟 App 後，再回來點「開啟推播通知」</li>
-        </ol>
-      ) : ios ? (
-        <p className="text-emerald-100/60">
-          已從主畫面開啟。點下方按鈕並允許通知即可收到開團推播。
-        </p>
+      {ios ? (
+        <div className="space-y-2">
+          <p className="font-medium text-emerald-200/90">iPhone／iPad 設定步驟</p>
+          <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
+            <li>請用 Safari 開啟本站（勿用 LINE 內建瀏覽器）</li>
+            <li>系統需 iOS 16.4 或更新版本</li>
+            <li>點底部分享按鈕 → 選擇「加入主畫面」</li>
+            <li>從主畫面圖示開啟 App（不是 Safari 分頁）</li>
+            <li>到「我的」點「開啟推播通知」並允許</li>
+          </ol>
+          {iosNeedsInstall ? (
+            <p className="text-amber-200/90">
+              目前還在瀏覽器分頁中。請先加入主畫面，否則 iPhone
+              無法收到推播。
+            </p>
+          ) : (
+            <p className="text-emerald-100/60">
+              已從主畫面開啟。請點下方按鈕並允許通知。
+            </p>
+          )}
+        </div>
       ) : status === "unsupported" ? (
         <p className="text-emerald-100/60">
           此瀏覽器不支援網頁推播。請改用 Android 的 Chrome，或將網站加入主畫面後再開啟。
         </p>
       ) : (
         <p className="text-emerald-100/60">
-          Android 或電腦版 Chrome：直接點下方按鈕並允許通知即可，無需額外安裝。
+          Android 或電腦版 Chrome：直接點下方按鈕並允許通知即可。
         </p>
       )}
 
-      {canEnablePush && !iosNeedsInstall && (
+      {!guideOnly && canEnablePush && !iosNeedsInstall && (
         <button
           type="button"
           onClick={() => void (status === "on" ? disable() : enable())}
-          className="text-emerald-300 underline-offset-2 hover:underline"
+          className="h-10 w-full rounded-md bg-emerald-400/90 font-semibold text-emerald-950"
         >
           {status === "on" ? "關閉推播" : "開啟推播通知"}
         </button>
       )}
 
-      {canEnablePush && iosNeedsInstall && (
-        <p className="text-amber-200/80">加入主畫面並從圖示開啟後，才會出現開啟按鈕。</p>
+      {!guideOnly && (
+        <p className="text-xs text-emerald-100/45">
+          另需已設定配速偏好，才會收到符合區間的開團推播；追蹤主揪則不受配速限制。
+        </p>
       )}
     </div>
   );

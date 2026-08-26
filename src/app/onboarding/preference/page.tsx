@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { PushRegister } from "@/components/PushRegister";
 import { apiErrorMessage } from "@/lib/api-errors";
 
 const PRESETS = [
@@ -93,11 +94,15 @@ export default function PreferencePage() {
 
       {error && <p className="mt-4 text-sm text-amber-300">{error}</p>}
 
+      <div className="mt-8">
+        <PushRegister guideOnly />
+      </div>
+
       <button
         type="button"
         disabled={loading || paceMin == null}
         onClick={() => void submit()}
-        className="mt-10 h-12 rounded-lg bg-emerald-400 font-semibold text-emerald-950 disabled:opacity-60"
+        className="mt-8 h-12 rounded-lg bg-emerald-400 font-semibold text-emerald-950 disabled:opacity-60"
       >
         {loading ? "儲存中…" : "完成"}
       </button>
