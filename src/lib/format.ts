@@ -10,6 +10,48 @@ export function parsePaceToSeconds(mmss: string): number | null {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+/** 配速選單：秒僅 0 / 15 / 30 */
+export const PACE_SECOND_OPTIONS = [0, 15, 30] as const;
+export const PACE_MINUTE_MIN = 3;
+export const PACE_MINUTE_MAX = 12;
+
+export function combinePace(minutes: number, seconds: number): number {
+  return minutes * 60 + seconds;
+}
+
+/** 將任意秒／公里對齊到選單可用的分＋0/15/30 */
+export function snapPaceToStep(totalSeconds: number): number {
+  const clamped = Math.min(
+    PACE_MINUTE_MAX * 60,
+    Math.max(PACE_MINUTE_MIN * 60, totalSeconds),
+  );
+  let best = PACE_MINUTE_MIN * 60;
+  let bestDist = Infinity;
+  for (let m = PACE_MINUTE_MIN; m <= PACE_MINUTE_MAX; m++) {
+    for (const s of PACE_SECOND_OPTIONS) {
+      if (m === PACE_MINUTE_MAX && s > 0) continue;
+      const candidate = combinePace(m, s);
+      const dist = Math.abs(candidate - clamped);
+      if (dist < bestDist) {
+        best = candidate;
+        bestDist = dist;
+      }
+    }
+  }
+  return best;
+}
+
+export function splitPace(totalSeconds: number): {
+  minutes: number;
+  seconds: number;
+} {
+  const snapped = snapPaceToStep(totalSeconds);
+  return {
+    minutes: Math.floor(snapped / 60),
+    seconds: snapped % 60,
+  };
+}
+
 export function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei",

@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
+import { PaceSelect } from "@/components/PaceSelect";
 import { canUseCustomLocation } from "@/lib/rbac";
 import { apiErrorMessage } from "@/lib/api-errors";
+import { snapPaceToStep } from "@/lib/format";
 import type { PwaLocation, UserRole } from "@/types/database";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -35,8 +37,8 @@ export default function NewRunPage() {
 
   useEffect(() => {
     if (meData?.pace_min && meData?.pace_max) {
-      setPaceMin(meData.pace_min);
-      setPaceMax(meData.pace_max);
+      setPaceMin(snapPaceToStep(meData.pace_min));
+      setPaceMax(snapPaceToStep(meData.pace_max));
     }
   }, [meData]);
 
@@ -46,6 +48,10 @@ export default function NewRunPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (paceMin > paceMax) {
+      setError("配速區間無效：較快端應 ≤ 較慢端（例：5分00秒–6分00秒）");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -167,26 +173,21 @@ export default function NewRunPage() {
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm text-emerald-100/80">
-            配速下限（秒）
-            <input
-              type="number"
-              value={paceMin}
-              onChange={(e) => setPaceMin(Number(e.target.value))}
-              className="mt-1 w-full rounded-md border border-emerald-800/60 bg-transparent px-3 py-2"
-            />
-          </label>
-          <label className="text-sm text-emerald-100/80">
-            配速上限（秒）
-            <input
-              type="number"
-              value={paceMax}
-              onChange={(e) => setPaceMax(Number(e.target.value))}
-              className="mt-1 w-full rounded-md border border-emerald-800/60 bg-transparent px-3 py-2"
-            />
-          </label>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <PaceSelect
+            label="配速下限（較快）"
+            value={paceMin}
+            onChange={setPaceMin}
+          />
+          <PaceSelect
+            label="配速上限（較慢）"
+            value={paceMax}
+            onChange={setPaceMax}
+          />
         </div>
+        <p className="text-xs text-emerald-100/40">
+          單位：分秒／公里；秒僅可選 00／15／30
+        </p>
 
         <label className="text-sm text-emerald-100/80">
           名額
