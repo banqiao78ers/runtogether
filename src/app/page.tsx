@@ -24,6 +24,12 @@ export default function HomePage() {
   const { data, isLoading } = useSWR<{ runs: RunRow[] }>("/api/runs", fetcher, {
     refreshInterval: 15000,
   });
+  const { data: me } = useSWR("/api/auth/me", fetcher, {
+    revalidateOnFocus: true,
+  });
+
+  const showPushBanner =
+    me && !me.error && me.has_push === false && !me.is_banned;
 
   return (
     <main className="relative flex flex-1 flex-col px-5 pt-8">
@@ -38,6 +44,18 @@ export default function HomePage() {
         <h1 className="mt-1 text-3xl font-bold text-white">板橋約跑</h1>
         <p className="mt-2 text-sm text-emerald-100/55">近期揪團 · 先搶先贏</p>
       </header>
+
+      {showPushBanner && (
+        <Link
+          href="/me"
+          className="mb-6 block rounded-lg border border-amber-400/35 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 transition hover:bg-amber-400/15"
+        >
+          <p className="font-medium text-amber-50">尚未開啟推播通知</p>
+          <p className="mt-1 text-amber-100/80">
+            開啟後才收得到符合配速的開團提醒。點此前往「我的」設定 →
+          </p>
+        </Link>
+      )}
 
       {isLoading && (
         <p className="text-sm text-emerald-100/50">載入中…</p>
