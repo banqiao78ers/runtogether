@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "板橋跑友揪團約跑",
     start_url: "/",
     display: "standalone",
-    background_color: "#0f1f17",
+    background_color: "#f2f2f2",
     theme_color: "#1a3a2a",
     lang: "zh-Hant",
     icons: [
