@@ -44,7 +44,8 @@ const API_ERROR_ZH: Record<string, string> = {
   ALREADY_REGISTERED: "已報名此活動",
   USER_NOT_FOUND: "找不到使用者",
   RUN_NOT_FOUND: "找不到活動",
-  IS_HOST: "主揪無需再報名",
+  VAPID_NOT_CONFIGURED: "伺服器尚未設定推播金鑰，請聯絡管理員",
+  VAPID_INVALID: "伺服器推播金鑰格式錯誤，請聯絡管理員",
 };
 
 export function apiErrorMessage(code: unknown, fallback = "操作失敗"): string {

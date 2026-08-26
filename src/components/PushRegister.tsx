@@ -3,12 +3,31 @@
 import { useEffect, useState } from "react";
 
 function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const cleaned = base64String.trim().replace(/^["']|["']$/g, "");
+  const padding = "=".repeat((4 - (cleaned.length % 4)) % 4);
+  const base64 = (cleaned + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64);
   const output = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
   return output;
+}
+
+async function fetchVapidPublicKey(): Promise<string> {
+  const res = await fetch("/api/push/vapid-public", { credentials: "same-origin" });
+  const j = (await res.json().catch(() => ({}))) as {
+    publicKey?: string;
+    error?: string;
+  };
+  if (!res.ok || !j.publicKey) {
+    if (j.error === "VAPID_NOT_CONFIGURED") {
+      throw new Error("伺服器尚未設定推播金鑰，請聯絡管理員");
+    }
+    if (j.error === "VAPID_INVALID") {
+      throw new Error("伺服器推播金鑰格式錯誤，請聯絡管理員");
+    }
+    throw new Error("無法取得推播金鑰");
+  }
+  return j.publicKey;
 }
 
 function isIosDevice() {
@@ -91,9 +110,10 @@ export function PushRegister({ guideOnly = false }: Props) {
         return;
       }
 
-      const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!key) {
-        setError("尚未設定推播金鑰，請聯絡管理員");
+      const key = await fetchVapidPublicKey();
+      const applicationServerKey = urlBase64ToUint8Array(key);
+      if (applicationServerKey.byteLength !== 65) {
+        setError("推播金鑰長度不正確，請聯絡管理員檢查 Vercel 環境變數");
         return;
       }
 
@@ -127,7 +147,7 @@ export function PushRegister({ guideOnly = false }: Props) {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
+        applicationServerKey,
       });
 
       const res = await fetch("/api/push/subscribe", {
@@ -148,10 +168,14 @@ export function PushRegister({ guideOnly = false }: Props) {
       setStatus("on");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/denied|not allowed/i.test(msg)) {
+      if (/applicationServerKey|not valid/i.test(msg)) {
+        setError(
+          "推播金鑰無效。請到 Vercel 確認 NEXT_PUBLIC_VAPID_PUBLIC_KEY 是否正確後重新部署",
+        );
+      } else if (/denied|not allowed/i.test(msg)) {
         setError("通知權限被拒絕，請在瀏覽器設定允許後重試");
       } else {
-        setError(`開啟失敗：${msg || "未知錯誤"}`);
+        setError(`開啟失敗：${/[\u4e00-\u9fff]/.test(msg) ? msg : "請稍後再試或聯絡管理員"}`);
       }
     } finally {
       setBusy(false);

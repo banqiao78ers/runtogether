@@ -11,6 +11,7 @@ function isPublicPath(pathname: string, method: string): boolean {
   if (pathname.startsWith("/icons/")) return true;
   if (pathname.startsWith("/api/auth/")) return true;
   if (pathname.startsWith("/api/cron/")) return true;
+  if (method === "GET" && pathname === "/api/push/vapid-public") return true;
   if (method === "GET" && pathname === "/api/runs") return true;
   if (method === "GET" && /^\/api\/runs\/[^/]+$/.test(pathname)) return true;
   if (method === "GET" && pathname === "/api/locations") return true;
