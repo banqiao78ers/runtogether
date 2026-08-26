@@ -85,9 +85,11 @@ export default function HomePage() {
                 </div>
                 <p className="mt-1 text-sm text-emerald-100/80">{place}</p>
                 <p className="mt-2 text-xs text-emerald-100/45">
-                  {run.distance_km} km · {paceLabel(run.pace_min)}–
-                  {paceLabel(run.pace_max)} · {run.participant_count}/
-                  {run.max_participants}
+                  {run.distance_km} km ·{" "}
+                  <span className="font-medium text-yellow-300">
+                    {paceLabel(run.pace_min)}–{paceLabel(run.pace_max)}
+                  </span>{" "}
+                  · {run.participant_count}/{run.max_participants}
                   {run.host?.display_name ? ` · ${run.host.display_name}` : ""}
                 </p>
               </Link>
