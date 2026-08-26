@@ -3,7 +3,8 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import useSWR from "swr";
-import { formatDateTime, paceLabel } from "@/lib/format";
+import { formatDateTime, paceLabel, participantStatusLabel, runStatusLabel } from "@/lib/format";
+import { apiErrorMessage } from "@/lib/api-errors";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -35,7 +36,7 @@ export default function RunDetailPage() {
     setFollowBusy(false);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error || "追蹤失敗");
+      setMsg(apiErrorMessage(j.error, "追蹤失敗"));
       return;
     }
     await mutate();
@@ -43,6 +44,19 @@ export default function RunDetailPage() {
 
   async function act(path: string, body?: unknown) {
     setMsg(null);
+    if (path === "cancel") {
+      const reason =
+        typeof body === "object" &&
+        body &&
+        "reason" in body &&
+        typeof (body as { reason?: string }).reason === "string"
+          ? (body as { reason: string }).reason.trim()
+          : "";
+      if (!reason) {
+        setMsg("請填寫取消原因");
+        return;
+      }
+    }
     const res = await fetch(`/api/runs/${id}/${path}`, {
       method: "POST",
       headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -50,12 +64,14 @@ export default function RunDetailPage() {
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(json.error || "操作失敗");
+      setMsg(apiErrorMessage(json.error));
       return;
     }
     await mutate();
     if (path === "cancel" && json.voting_enabled) {
       setMsg("活動已取消。若認為惡意取消，可投票檢舉。");
+    } else if (path === "cancel") {
+      setMsg("活動已取消");
     }
   }
 
@@ -67,7 +83,7 @@ export default function RunDetailPage() {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error || "留言失敗");
+      setMsg(apiErrorMessage(j.error, "留言失敗"));
       return;
     }
     setComment("");
@@ -150,7 +166,7 @@ export default function RunDetailPage() {
         </div>
         <div>
           <dt className="text-emerald-100/40">狀態</dt>
-          <dd>{run.status}</dd>
+          <dd>{runStatusLabel(run.status)}</dd>
         </div>
       </dl>
 
@@ -267,7 +283,7 @@ export default function RunDetailPage() {
               user?: { display_name: string };
             }) => (
               <li key={p.id} className="text-sm text-emerald-100/70">
-                {p.user?.display_name || "跑友"} · {p.status}
+                {p.user?.display_name || "跑友"} · {participantStatusLabel(p.status)}
               </li>
             ),
           )}

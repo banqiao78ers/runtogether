@@ -52,7 +52,7 @@ export function PushRegister() {
   async function enable() {
     const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!key) {
-      alert("尚未設定 VAPID public key");
+      alert("尚未設定推播金鑰，請聯絡管理員");
       return;
     }
     const permission = await Notification.requestPermission();
@@ -101,11 +101,11 @@ export function PushRegister() {
         </p>
       ) : status === "unsupported" ? (
         <p className="text-emerald-100/60">
-          此瀏覽器不支援 Web Push。請改用 Android Chrome，或將網站加入主畫面後再開啟。
+          此瀏覽器不支援網頁推播。請改用 Android 的 Chrome，或將網站加入主畫面後再開啟。
         </p>
       ) : (
         <p className="text-emerald-100/60">
-          Android／桌面 Chrome：直接點下方按鈕並允許通知即可，無需額外安裝。
+          Android 或電腦版 Chrome：直接點下方按鈕並允許通知即可，無需額外安裝。
         </p>
       )}
 

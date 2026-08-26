@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { apiErrorMessage } from "@/lib/api-errors";
 
 const PRESETS = [
   { label: "4:30–5:00", min: 270, max: 300 },
@@ -55,7 +56,7 @@ export default function PreferencePage() {
     setLoading(false);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setError(j.error || "儲存失敗");
+      setError(apiErrorMessage(j.error, "儲存失敗"));
       return;
     }
     router.replace("/");

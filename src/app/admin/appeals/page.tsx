@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { appealStatusLabel } from "@/lib/format";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -33,7 +34,7 @@ export default function AdminAppealsPage() {
               className="border-b border-emerald-900/40 pb-4 text-sm text-emerald-100/75"
             >
               <p className="font-medium text-white">
-                {a.user?.display_name || "用戶"} · {a.status}
+                {a.user?.display_name || "用戶"} · {appealStatusLabel(a.status)}
               </p>
               <p className="mt-1 text-emerald-100/50">
                 {new Date(a.created_at).toLocaleString("zh-TW")}

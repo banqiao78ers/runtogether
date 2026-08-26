@@ -31,3 +31,57 @@ export const ACTIVE_PARTICIPANT_STATUSES = [
   "arrived",
   "attended",
 ] as const;
+
+const RUN_STATUS_ZH: Record<string, string> = {
+  open: "報名中",
+  delayed: "已延期",
+  ongoing: "進行中",
+  completed: "已結案",
+  cancelled: "已取消",
+};
+
+const PARTICIPANT_STATUS_ZH: Record<string, string> = {
+  registered: "已報名",
+  arrived: "已到達",
+  attended: "已出席",
+  cancelled: "已取消報名",
+  no_show: "未到",
+};
+
+const ROLE_ZH: Record<string, string> = {
+  member: "一般會員",
+  super_member: "超級會員",
+  admin: "管理員",
+};
+
+const APPEAL_STATUS_ZH: Record<string, string> = {
+  pending: "審核中",
+  approved: "已核准",
+  rejected: "已駁回",
+};
+
+export function runStatusLabel(status: string): string {
+  return RUN_STATUS_ZH[status] ?? status;
+}
+
+export function participantStatusLabel(status: string): string {
+  return PARTICIPANT_STATUS_ZH[status] ?? status;
+}
+
+export function roleLabel(role: string): string {
+  return ROLE_ZH[role] ?? role;
+}
+
+export function appealStatusLabel(status: string): string {
+  return APPEAL_STATUS_ZH[status] ?? status;
+}
+
+/** 首頁列表用狀態徽章 */
+export function runListBadge(status: string, full: boolean): string {
+  if (status === "delayed") return "已延期";
+  if (status === "ongoing") return "進行中";
+  if (status === "completed") return "已結案";
+  if (status === "cancelled") return "已取消";
+  if (full) return "額滿";
+  return "報名中";
+}

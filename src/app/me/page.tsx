@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { PushRegister } from "@/components/PushRegister";
-import { paceLabel } from "@/lib/format";
+import { paceLabel, roleLabel } from "@/lib/format";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -42,7 +42,7 @@ export default function MePage() {
         )}
         <div>
           <h1 className="text-xl font-bold text-white">{data.display_name}</h1>
-          <p className="text-sm text-emerald-100/50">{data.role}</p>
+          <p className="text-sm text-emerald-100/50">{roleLabel(data.role)}</p>
         </div>
       </div>
 

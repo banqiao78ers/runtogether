@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import useSWR from "swr";
-import { formatDateTime, paceLabel } from "@/lib/format";
+import { formatDateTime, paceLabel, runListBadge } from "@/lib/format";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -32,8 +32,8 @@ export default function HomePage() {
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,#2d5a40_0%,transparent_55%),linear-gradient(180deg,#0f1f17,#0c1812)]"
       />
       <header className="mb-8">
-        <p className="text-xs font-medium tracking-[0.2em] text-emerald-300/70 uppercase">
-          Banqiao
+        <p className="text-xs font-medium tracking-[0.2em] text-emerald-300/70">
+          板橋
         </p>
         <h1 className="mt-1 text-3xl font-bold text-white">板橋約跑</h1>
         <p className="mt-2 text-sm text-emerald-100/55">近期揪團 · 先搶先贏</p>
@@ -62,7 +62,7 @@ export default function HomePage() {
                     {formatDateTime(run.start_time)}
                   </time>
                   <span className="text-xs text-emerald-300/70">
-                    {run.status === "delayed" ? "已延期" : full ? "額滿" : "報名中"}
+                    {runListBadge(run.status, full)}
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-emerald-100/80">{place}</p>

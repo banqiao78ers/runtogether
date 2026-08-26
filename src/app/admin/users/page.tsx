@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { roleLabel } from "@/lib/format";
 import type { UserRole } from "@/types/database";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -40,8 +41,7 @@ export default function AdminUsersPage() {
     <main className="px-5 py-8">
       <h1 className="text-xl font-bold text-white">會員角色（規則 C）</h1>
       <p className="mt-2 text-sm text-emerald-100/55">
-        首次 LINE 登入皆為 member。請對照下方既有 profiles 顯示名稱，手動升格
-        super_member／admin。
+        首次 LINE 登入皆為一般會員。請對照下方既有會員資料的顯示名稱，手動升格為超級會員或管理員。
       </p>
 
       <input
@@ -51,7 +51,7 @@ export default function AdminUsersPage() {
         className="mt-6 w-full rounded-md border border-emerald-800/60 bg-transparent px-3 py-2 text-sm"
       />
 
-      <h2 className="mt-8 text-sm font-medium text-emerald-300/80">PWA 會員</h2>
+      <h2 className="mt-8 text-sm font-medium text-emerald-300/80">本站會員</h2>
       <ul className="mt-3 space-y-4">
         {users.map(
           (u: {
@@ -76,9 +76,11 @@ export default function AdminUsersPage() {
                   }
                   className="rounded border border-emerald-800/60 bg-[#0c1812] px-2 py-1"
                 >
-                  <option value="member">member</option>
-                  <option value="super_member">super_member</option>
-                  <option value="admin">admin</option>
+                  <option value="member">{roleLabel("member")}</option>
+                  <option value="super_member">
+                    {roleLabel("super_member")}
+                  </option>
+                  <option value="admin">{roleLabel("admin")}</option>
                 </select>
               </div>
               <button
@@ -94,11 +96,11 @@ export default function AdminUsersPage() {
       </ul>
 
       <h2 className="mt-10 text-sm font-medium text-emerald-300/80">
-        既有 profiles（對照用）
+        既有會員資料（對照用）
       </h2>
       {data?.profiles_error && (
         <p className="mt-2 text-xs text-amber-300">
-          無法讀取 profiles：{data.profiles_error}
+          無法讀取既有會員資料：{data.profiles_error}
         </p>
       )}
       <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto text-sm text-emerald-100/50">

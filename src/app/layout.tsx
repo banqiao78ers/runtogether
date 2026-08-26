@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: "板橋約跑",
     template: "%s · 板橋約跑",
   },
-  description: "板橋跑友揪團約跑 Progressive Web App",
+  description: "板橋跑友揪團約跑網頁 App",
   applicationName: "板橋約跑",
   icons: {
     icon: [

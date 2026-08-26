@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { canUseCustomLocation } from "@/lib/rbac";
+import { apiErrorMessage } from "@/lib/api-errors";
 import type { PwaLocation, UserRole } from "@/types/database";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -69,7 +70,7 @@ export default function NewRunPage() {
     const json = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      setError(json.error || "開團失敗");
+      setError(apiErrorMessage(json.error, "開團失敗"));
       return;
     }
     router.push(`/runs/${json.run.id}`);

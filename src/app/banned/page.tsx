@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { apiErrorMessage } from "@/lib/api-errors";
+import { appealStatusLabel } from "@/lib/format";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -19,7 +21,7 @@ export default function BannedPage() {
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(json.error || "送出失敗");
+      setMsg(apiErrorMessage(json.error, "送出失敗"));
       return;
     }
     setReason("");
@@ -54,7 +56,8 @@ export default function BannedPage() {
         {(data?.appeals ?? []).map(
           (a: { id: string; status: string; created_at: string }) => (
             <li key={a.id}>
-              {new Date(a.created_at).toLocaleString("zh-TW")} · {a.status}
+              {new Date(a.created_at).toLocaleString("zh-TW")} ·{" "}
+              {appealStatusLabel(a.status)}
             </li>
           ),
         )}

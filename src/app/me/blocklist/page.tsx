@@ -35,7 +35,7 @@ export default function BlocklistPage() {
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
           className="flex-1 rounded-md border border-emerald-800/60 bg-transparent px-3 py-2 text-sm"
-          placeholder="user uuid"
+          placeholder="對方使用者編號（UUID）"
         />
         <button
           type="button"
