@@ -22,6 +22,8 @@ export function buildLineAuthorizeUrl(state: string): string {
     redirect_uri: callbackUrl,
     state,
     scope: "profile openid",
+    // iOS：避免 LINE App auto-login 開新瀏覽器導致 line_oauth_state cookie 遺失
+    disable_auto_login: "true",
   });
   return `${LINE_AUTH}?${params.toString()}`;
 }
