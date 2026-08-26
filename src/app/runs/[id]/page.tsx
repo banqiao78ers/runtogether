@@ -21,10 +21,12 @@ export default function RunDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [delayMins, setDelayMins] = useState(10);
   const [followBusy, setFollowBusy] = useState(false);
+  const [forcePushBusy, setForcePushBusy] = useState(false);
 
   const run = data?.run;
   const me = data?.me;
   const following = !!me?.following_host;
+  const isAdmin = me?.role === "admin";
 
   async function toggleFollow() {
     if (!run?.host?.id || followBusy) return;
@@ -88,6 +90,26 @@ export default function RunDetailPage() {
     }
     setComment("");
     await mutate();
+  }
+
+  async function forcePush() {
+    if (forcePushBusy) return;
+    const ok = window.confirm(
+      "確定要強制推播此活動給所有已開啟推播的會員？（略過配速過濾）",
+    );
+    if (!ok) return;
+    setForcePushBusy(true);
+    setMsg(null);
+    const res = await fetch(`/api/runs/${id}/force-push`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setForcePushBusy(false);
+    if (!res.ok) {
+      setMsg(apiErrorMessage(json.error, "強制推播失敗"));
+      return;
+    }
+    setMsg(
+      `強制推播完成：訂閱 ${json.total}、成功 ${json.sent}、失敗 ${json.failed}、過期 ${json.expired}`,
+    );
   }
 
   if (isLoading || !run) {
@@ -178,6 +200,17 @@ export default function RunDetailPage() {
       )}
 
       {msg && <p className="mt-4 text-sm text-amber-300">{msg}</p>}
+
+      {isAdmin && !closed && (
+        <button
+          type="button"
+          disabled={forcePushBusy}
+          onClick={() => void forcePush()}
+          className="mt-4 h-11 w-full rounded-lg border border-amber-400/50 bg-amber-400/10 font-medium text-amber-100 disabled:opacity-50"
+        >
+          {forcePushBusy ? "推播中…" : "管理員：強制推播宣傳此活動"}
+        </button>
+      )}
 
       <div className="mt-6 flex flex-col gap-2">
         {!closed && me && !isHost && !joined && (
