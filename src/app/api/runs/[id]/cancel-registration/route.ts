@@ -21,7 +21,7 @@ export async function POST(_request: Request, ctx: Ctx) {
     if (run.host_id === user.id) {
       return jsonError("HOST_MUST_CANCEL_RUN", 400);
     }
-    if (!["open", "delayed"].includes(run.status)) {
+    if (!["open", "delayed", "ongoing"].includes(run.status)) {
       return jsonError("RUN_CLOSED", 400);
     }
 

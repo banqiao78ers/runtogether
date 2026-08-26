@@ -127,6 +127,7 @@ export default function RunDetailPage() {
   const isHost = me?.is_host;
   const joined = !!me?.participation;
   const closed = ["completed", "cancelled"].includes(run.status);
+  const canArrive = new Date(run.start_time).getTime() <= Date.now();
 
   return (
     <main className="px-5 py-8">
@@ -225,13 +226,19 @@ export default function RunDetailPage() {
         )}
         {!closed && me && !isHost && joined && (
           <>
-            <button
-              type="button"
-              onClick={() => void act("arrive")}
-              className="h-11 rounded-lg border border-emerald-500/40 text-emerald-200"
-            >
-              我已到達
-            </button>
+            {canArrive ? (
+              <button
+                type="button"
+                onClick={() => void act("arrive")}
+                className="h-11 rounded-lg border border-emerald-500/40 text-emerald-200"
+              >
+                我已到達
+              </button>
+            ) : (
+              <p className="text-center text-sm text-emerald-100/45">
+                集合時間到後才能簽到到達
+              </p>
+            )}
             <button
               type="button"
               onClick={() => void act("cancel-registration")}

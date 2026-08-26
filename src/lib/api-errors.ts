@@ -14,6 +14,7 @@ const API_ERROR_ZH: Record<string, string> = {
   BANQIAO_ONLY: "一般會員僅能選擇板橋區集合點",
   TIME_OVERLAP: "時段與其他活動重疊",
   RUN_CLOSED: "活動已結束或關閉",
+  NOT_STARTED: "活動尚未開始，無法簽到",
   ALREADY_CLOSED: "活動已結束，無法操作",
   HOST_MUST_CANCEL_RUN: "主揪請改用「取消整場活動」",
   NOT_REGISTERED: "尚未報名此活動",

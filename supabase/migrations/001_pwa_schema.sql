@@ -193,7 +193,7 @@ BEGIN
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'code', 'RUN_NOT_FOUND');
   END IF;
-  IF v_run.status NOT IN ('open', 'delayed') THEN
+  IF v_run.status NOT IN ('open', 'delayed', 'ongoing') THEN
     RETURN jsonb_build_object('ok', false, 'code', 'RUN_CLOSED');
   END IF;
   IF v_run.host_id = p_user_id THEN

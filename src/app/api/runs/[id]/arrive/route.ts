@@ -21,6 +21,9 @@ export async function POST(_request: Request, ctx: Ctx) {
     if (!["open", "delayed", "ongoing"].includes(run.status)) {
       return jsonError("RUN_CLOSED");
     }
+    if (new Date(run.start_time).getTime() > Date.now()) {
+      return jsonError("NOT_STARTED");
+    }
 
     const { data: part } = await supabase
       .from("pwa_run_participants")
@@ -41,6 +44,7 @@ export async function POST(_request: Request, ctx: Ctx) {
       })
       .eq("id", part.id);
 
+    // 開始後才標 ongoing；報名 RPC 亦允許 ongoing（見 migration 004）
     if (run.status !== "ongoing") {
       await supabase.from("pwa_runs").update({ status: "ongoing" }).eq("id", id);
     }
