@@ -57,7 +57,8 @@
   採用嚴格區間交集（Overlap Algorithm）匹配推播受眾：
   `pwa_users.pace_min <= run.pace_max AND pwa_users.pace_max >= run.pace_min`
   （自動排除主揪本人與已關閉通知之用戶）。
-* **開跑前提醒排程**：定時任務檢查「起跑前 60 分鐘」之活動，向全體已報名者發送開跑提醒推播。
+* **追蹤主揪**：用戶可追蹤特定主揪（`pwa_host_follows`）。追蹤者收到該主揪開團推播時**略過配速過濾**（仍須已開啟 Web Push），與配速匹配受眾取聯集後發送。
+* **開跑前提醒排程**：定時任務檢查「起跑前 60 分鐘」之活動，向全體已報名者發送開跑提醒推播。（Vercel Hobby Cron 每日一次，實務上僅當 cron 觸發時刻恰落在該 60 分鐘窗才會送出。）
 * **推播點擊與喚醒**：Service Worker 監聽點擊事件，背景視窗喚醒 `focus()` 並精準導向該活動詳細頁 `/runs/[id]`，自動觸發 SWR 重新拉取最新狀態。
 
 ### 3.5 現場簽到、結案與留言
@@ -150,6 +151,16 @@ CREATE TABLE pwa_host_blocklists (
   blocked_user_id UUID NOT NULL REFERENCES pwa_users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_host_blocked UNIQUE (host_id, blocked_user_id)
+);
+
+-- 6b. 追蹤主揪（開團推播略過配速過濾）
+CREATE TABLE pwa_host_follows (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  follower_id UUID NOT NULL REFERENCES pwa_users(id) ON DELETE CASCADE,
+  host_id UUID NOT NULL REFERENCES pwa_users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_follower_host UNIQUE (follower_id, host_id),
+  CONSTRAINT chk_not_self_follow CHECK (follower_id <> host_id)
 );
 
 -- 7. 惡意取消檢舉投票表

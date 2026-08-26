@@ -10,7 +10,7 @@
 
 ## 上線前必做
 
-1. 在 Supabase SQL Editor 執行 [`supabase/migrations/001_pwa_schema.sql`](./supabase/migrations/001_pwa_schema.sql)
+1. 在 Supabase SQL Editor 執行 [`supabase/migrations/001_pwa_schema.sql`](./supabase/migrations/001_pwa_schema.sql)；若尚未建追蹤表，再執行 [`002_host_follows.sql`](./supabase/migrations/002_host_follows.sql)
 2. 複製 `.env.example` → `.env.local`（與 Vercel Environment Variables）填入金鑰
 3. 第一位 admin：於 DB 手動 `UPDATE pwa_users SET role='admin' WHERE ...`，之後可用後台升格
 4. 舊會員升格採**規則 C**：對照 `profiles` 顯示名稱，於 `/admin/users` 手動設為 `super_member`

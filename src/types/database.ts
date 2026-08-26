@@ -100,6 +100,13 @@ export type PwaHostBlocklist = {
   created_at: string;
 };
 
+export type PwaHostFollow = {
+  id: string;
+  follower_id: string;
+  host_id: string;
+  created_at: string;
+};
+
 export type PwaCancellationVote = {
   id: string;
   run_id: string;

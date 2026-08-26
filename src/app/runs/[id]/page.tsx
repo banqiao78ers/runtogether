@@ -19,9 +19,27 @@ export default function RunDetailPage() {
   const [comment, setComment] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [delayMins, setDelayMins] = useState(10);
+  const [followBusy, setFollowBusy] = useState(false);
 
   const run = data?.run;
   const me = data?.me;
+  const following = !!me?.following_host;
+
+  async function toggleFollow() {
+    if (!run?.host?.id || followBusy) return;
+    setFollowBusy(true);
+    setMsg(null);
+    const res = await fetch(`/api/hosts/${run.host.id}/follow`, {
+      method: following ? "DELETE" : "POST",
+    });
+    setFollowBusy(false);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setMsg(j.error || "追蹤失敗");
+      return;
+    }
+    await mutate();
+  }
 
   async function act(path: string, body?: unknown) {
     setMsg(null);
@@ -89,6 +107,29 @@ export default function RunDetailPage() {
       {run.location_detail && (
         <p className="text-sm text-emerald-100/50">{run.location_detail}</p>
       )}
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-sm text-emerald-100/70">
+          主揪{" "}
+          <span className="text-emerald-100">
+            {run.host?.display_name || "跑友"}
+          </span>
+        </p>
+        {me && !isHost && (
+          <button
+            type="button"
+            onClick={() => void toggleFollow()}
+            className={`shrink-0 rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 ${
+              following
+                ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
+                : "border-emerald-800/60 text-emerald-100/70"
+            }`}
+            disabled={followBusy}
+          >
+            {following ? "已追蹤" : "追蹤主揪"}
+          </button>
+        )}
+      </div>
 
       <dl className="mt-6 grid grid-cols-2 gap-3 text-sm text-emerald-100/70">
         <div>

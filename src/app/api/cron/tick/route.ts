@@ -35,11 +35,11 @@ export async function GET(request: NextRequest) {
       .eq("run_id", run.id)
       .in("status", ["registered", "arrived"]);
 
-    notifyUsers(
+      notifyUsers(
       (parts ?? []).map((p) => p.user_id),
       {
-        title: "Run reminder",
-        body: "Your run starts in about one hour",
+        title: "約跑提醒",
+        body: "活動約一小時後開始，記得準時集合",
         url: `/runs/${run.id}`,
       },
     );
@@ -68,8 +68,8 @@ export async function GET(request: NextRequest) {
 
     if (!run.completion_reminder_sent_at) {
       notifyUsers([run.host_id], {
-        title: "Please complete attendance",
-        body: "The run has ended. Please mark attendance.",
+        title: "請結案點名",
+        body: "活動已結束，請至詳情頁完成點名結案",
         url: `/runs/${run.id}`,
       });
       await supabase

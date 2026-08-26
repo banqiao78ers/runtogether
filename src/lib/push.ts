@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { formatDateTime, paceLabel } from "@/lib/format";
 import type { PushSubscriptionJSON } from "@/types/database";
 
 let configured = false;
@@ -52,31 +53,86 @@ export function notifyRunCreated(run: {
   void (async () => {
     try {
       const supabase = getSupabaseAdmin();
-      const { data: users } = await supabase
-        .from("pwa_users")
-        .select("id, push_subscription, pace_min, pace_max")
-        .not("push_subscription", "is", null)
-        .not("pace_min", "is", null)
-        .not("pace_max", "is", null)
-        .eq("is_banned", false)
-        .neq("id", run.host_id);
 
-      const targets = (users ?? []).filter(
-        (u) =>
+      const [{ data: host }, { data: paceUsers }, { data: follows }] =
+        await Promise.all([
+          supabase
+            .from("pwa_users")
+            .select("display_name")
+            .eq("id", run.host_id)
+            .maybeSingle(),
+          supabase
+            .from("pwa_users")
+            .select("id, push_subscription, pace_min, pace_max")
+            .not("push_subscription", "is", null)
+            .not("pace_min", "is", null)
+            .not("pace_max", "is", null)
+            .eq("is_banned", false)
+            .neq("id", run.host_id),
+          supabase
+            .from("pwa_host_follows")
+            .select("follower_id")
+            .eq("host_id", run.host_id),
+        ]);
+
+      const followerIds = new Set((follows ?? []).map((f) => f.follower_id));
+
+      let followerUsers: {
+        id: string;
+        push_subscription: PushSubscriptionJSON | null;
+      }[] = [];
+
+      if (followerIds.size > 0) {
+        const { data } = await supabase
+          .from("pwa_users")
+          .select("id, push_subscription")
+          .in("id", [...followerIds])
+          .not("push_subscription", "is", null)
+          .eq("is_banned", false)
+          .neq("id", run.host_id);
+        followerUsers = data ?? [];
+      }
+
+      const byId = new Map<
+        string,
+        { id: string; push_subscription: PushSubscriptionJSON }
+      >();
+
+      for (const u of paceUsers ?? []) {
+        if (
           u.pace_min != null &&
           u.pace_max != null &&
           u.pace_min <= run.pace_max &&
           u.pace_max >= run.pace_min &&
-          u.push_subscription,
-      );
+          u.push_subscription
+        ) {
+          byId.set(u.id, {
+            id: u.id,
+            push_subscription: u.push_subscription as PushSubscriptionJSON,
+          });
+        }
+      }
+
+      for (const u of followerUsers) {
+        if (u.push_subscription) {
+          byId.set(u.id, {
+            id: u.id,
+            push_subscription: u.push_subscription as PushSubscriptionJSON,
+          });
+        }
+      }
+
+      const hostName = host?.display_name || "跑友";
+      const when = formatDateTime(run.start_time);
+      const pace = `${paceLabel(run.pace_min)}–${paceLabel(run.pace_max)}`;
 
       await Promise.all(
-        targets.map((u) =>
+        [...byId.values()].map((u) =>
           sendPushToSubscription(
-            u.push_subscription as PushSubscriptionJSON,
+            u.push_subscription,
             {
-              title: "New run",
-              body: "A run matching your pace is open",
+              title: "有新約跑開團",
+              body: `${hostName} · ${when} · ${pace}`,
               url: `/runs/${run.id}`,
             },
             u.id,

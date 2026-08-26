@@ -50,6 +50,17 @@ export async function GET(_request: Request, ctx: Ctx) {
       ? (participants ?? []).find((p) => p.user_id === me.id) ?? null
       : null;
 
+    let followingHost = false;
+    if (me && run.host_id !== me.id) {
+      const { data: follow, error: followErr } = await supabase
+        .from("pwa_host_follows")
+        .select("id")
+        .eq("follower_id", me.id)
+        .eq("host_id", run.host_id)
+        .maybeSingle();
+      followingHost = !followErr && !!follow;
+    }
+
     return jsonOk({
       run,
       participants: participants ?? [],
@@ -61,6 +72,7 @@ export async function GET(_request: Request, ctx: Ctx) {
             role: me.role,
             is_host: run.host_id === me.id,
             participation: myParticipation,
+            following_host: followingHost,
           }
         : null,
     });
