@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 const PRESETS = [
   { label: "4:30–5:00", min: 270, max: 300 },
@@ -14,12 +14,37 @@ const PRESETS = [
 
 export default function PreferencePage() {
   const router = useRouter();
-  const [paceMin, setPaceMin] = useState(300);
-  const [paceMax, setPaceMax] = useState(360);
+  // 預設 5:00–6:00（對應既有 pace 300–360）
+  const [selected, setSelected] = useState<Set<number>>(() => new Set([1, 2]));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // 隱藏計算：多選區間取包絡，供 API／推播篩選使用
+  const { paceMin, paceMax } = useMemo(() => {
+    if (selected.size === 0) return { paceMin: null as number | null, paceMax: null as number | null };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const i of selected) {
+      min = Math.min(min, PRESETS[i].min);
+      max = Math.max(max, PRESETS[i].max);
+    }
+    return { paceMin: min, paceMax: max };
+  }, [selected]);
+
+  function toggle(index: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
   async function submit() {
+    if (paceMin == null || paceMax == null) {
+      setError("請至少選擇一個配速區間");
+      return;
+    }
     setLoading(true);
     setError(null);
     const res = await fetch("/api/me/preference", {
@@ -41,55 +66,35 @@ export default function PreferencePage() {
     <main className="flex flex-1 flex-col px-6 py-12">
       <h1 className="text-2xl font-bold text-white">設定配速偏好</h1>
       <p className="mt-2 text-sm text-emerald-100/60">
-        之後開團推播會依此區間匹配。單位：分鐘／公里。
+        可複選多個區間，之後開團推播會依此匹配。單位：分鐘／公里。
       </p>
 
       <div className="mt-8 flex flex-wrap gap-2">
-        {PRESETS.map((p) => (
-          <button
-            key={p.label}
-            type="button"
-            onClick={() => {
-              setPaceMin(p.min);
-              setPaceMax(p.max);
-            }}
-            className={`rounded-md border px-3 py-2 text-sm ${
-              paceMin === p.min && paceMax === p.max
-                ? "border-emerald-400 bg-emerald-400/15 text-emerald-200"
-                : "border-emerald-800/60 text-emerald-100/70"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-8 grid grid-cols-2 gap-4 text-sm text-emerald-100/80">
-        <label className="flex flex-col gap-1">
-          最快（秒/km）
-          <input
-            type="number"
-            value={paceMin}
-            onChange={(e) => setPaceMin(Number(e.target.value))}
-            className="rounded-md border border-emerald-800/60 bg-transparent px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          最慢（秒/km）
-          <input
-            type="number"
-            value={paceMax}
-            onChange={(e) => setPaceMax(Number(e.target.value))}
-            className="rounded-md border border-emerald-800/60 bg-transparent px-3 py-2"
-          />
-        </label>
+        {PRESETS.map((p, i) => {
+          const active = selected.has(i);
+          return (
+            <button
+              key={p.label}
+              type="button"
+              aria-pressed={active}
+              onClick={() => toggle(i)}
+              className={`rounded-md border px-3 py-2 text-sm ${
+                active
+                  ? "border-emerald-400 bg-emerald-400/15 text-emerald-200"
+                  : "border-emerald-800/60 text-emerald-100/70"
+              }`}
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
 
       {error && <p className="mt-4 text-sm text-amber-300">{error}</p>}
 
       <button
         type="button"
-        disabled={loading}
+        disabled={loading || paceMin == null}
         onClick={() => void submit()}
         className="mt-10 h-12 rounded-lg bg-emerald-400 font-semibold text-emerald-950 disabled:opacity-60"
       >
