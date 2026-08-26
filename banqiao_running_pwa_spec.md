@@ -57,8 +57,11 @@
   採用嚴格區間交集（Overlap Algorithm）匹配推播受眾：
   `pwa_users.pace_min <= run.pace_max AND pwa_users.pace_max >= run.pace_min`
   （自動排除主揪本人與已關閉通知之用戶）。
-* **追蹤主揪**：用戶可追蹤特定主揪（`pwa_host_follows`）。追蹤者收到該主揪開團推播時**略過配速過濾**（仍須已開啟 Web Push），與配速匹配受眾取聯集後發送。
-* **開跑前提醒排程**：定時任務檢查「起跑前 60 分鐘」之活動，向全體已報名者發送開跑提醒推播。（Vercel Hobby Cron 每日一次，實務上僅當 cron 觸發時刻恰落在該 60 分鐘窗才會送出。）
+* **開跑前提醒排程**：定時任務依剩餘時間門檻，向已報名者發送開跑提醒（各送一次）：
+  * 一天前：`start_time - now ≤ 24h` 且尚未進入六小時內 → `reminder_1d_sent_at`
+  * 六小時前：`≤ 6h` → `reminder_6h_sent_at`
+  * 一小時前：`≤ 1h` → `start_reminder_sent_at`
+  （Vercel Hobby Cron 每日一次；門檻採「進入時段即補送」，以降低漏送。若需準點六小時／一小時，需更高頻 Cron。）
 * **推播點擊與喚醒**：Service Worker 監聽點擊事件，背景視窗喚醒 `focus()` 並精準導向該活動詳細頁 `/runs/[id]`，自動觸發 SWR 重新拉取最新狀態。
 
 ### 3.5 現場簽到、結案與留言

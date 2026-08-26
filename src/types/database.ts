@@ -69,6 +69,8 @@ export type PwaRun = {
   cancel_reason: string | null;
   completion_reminder_sent_at: string | null;
   start_reminder_sent_at: string | null;
+  reminder_1d_sent_at: string | null;
+  reminder_6h_sent_at: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
