@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import useSWR from "swr";
-import { formatDateTime, paceLabel, runListBadge } from "@/lib/format";
+import { formatDateTime, paceLabel, runListBadge, isRunFull, participantsCountLabel } from "@/lib/format";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -68,7 +68,7 @@ export default function HomePage() {
             (run.location
               ? `${run.location.district} ${run.location.title}`
               : "地點未定");
-          const full = run.participant_count >= run.max_participants;
+          const full = isRunFull(run.participant_count, run.max_participants);
           return (
             <li key={run.id}>
               <Link
@@ -89,7 +89,7 @@ export default function HomePage() {
                   <span className="font-medium text-yellow-300">
                     {paceLabel(run.pace_min)}–{paceLabel(run.pace_max)}
                   </span>{" "}
-                  · {run.participant_count}/{run.max_participants}
+                  · {participantsCountLabel(run.participant_count, run.max_participants)}
                   {run.host?.display_name ? ` · ${run.host.display_name}` : ""}
                 </p>
               </Link>

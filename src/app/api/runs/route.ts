@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth/user";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCustomLocation } from "@/lib/rbac";
 import { notifyRunCreated } from "@/lib/push";
-import { runEndTime } from "@/lib/format";
+import { runEndTime, UNLIMITED_PARTICIPANTS } from "@/lib/format";
 
 const BANQIAO_DISTRICT = "\u677f\u6a4b\u5340"; // 板橋區
 
@@ -87,6 +87,14 @@ export async function POST(request: Request) {
     }
     if (body.pace_min > body.pace_max) return jsonError("INVALID_PACE");
 
+    const maxParticipants = body.max_participants ?? UNLIMITED_PARTICIPANTS;
+    if (
+      maxParticipants !== UNLIMITED_PARTICIPANTS &&
+      (maxParticipants < 2 || maxParticipants > 50)
+    ) {
+      return jsonError("INVALID_BODY");
+    }
+
     const duration = body.estimated_duration_minutes ?? 60;
     const start = new Date(body.start_time);
     if (
@@ -141,7 +149,7 @@ export async function POST(request: Request) {
         distance_km: body.distance_km,
         pace_min: body.pace_min,
         pace_max: body.pace_max,
-        max_participants: body.max_participants ?? 10,
+        max_participants: maxParticipants,
         note: body.note ?? null,
         status: "open",
       })

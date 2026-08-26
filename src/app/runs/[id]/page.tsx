@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import useSWR from "swr";
-import { formatDateTime, paceLabel, participantStatusLabel, runStatusLabel } from "@/lib/format";
+import { formatDateTime, paceLabel, participantStatusLabel, runStatusLabel, isRunFull, participantsCountLabel } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/api-errors";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -123,7 +123,7 @@ export default function RunDetailPage() {
     (run.location
       ? `${run.location.city}${run.location.district} ${run.location.title}`
       : "—");
-  const full = data.participant_count >= run.max_participants;
+  const full = isRunFull(data.participant_count, run.max_participants);
   const isHost = me?.is_host;
   const joined = !!me?.participation;
   const closed = ["completed", "cancelled"].includes(run.status);
@@ -183,7 +183,7 @@ export default function RunDetailPage() {
         <div>
           <dt className="text-emerald-100/40">名額</dt>
           <dd>
-            {data.participant_count}/{run.max_participants}
+            {participantsCountLabel(data.participant_count, run.max_participants)}
           </dd>
         </div>
         <div>

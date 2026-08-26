@@ -127,3 +127,24 @@ export function runListBadge(status: string, full: boolean): string {
   if (full) return "額滿";
   return "報名中";
 }
+
+/** DB 哨兵：名額不限制（遠大於實際揪團人數） */
+export const UNLIMITED_PARTICIPANTS = 9999;
+
+export function isUnlimitedParticipants(max: number): boolean {
+  return max >= UNLIMITED_PARTICIPANTS;
+}
+
+export function isRunFull(participantCount: number, max: number): boolean {
+  if (isUnlimitedParticipants(max)) return false;
+  return participantCount >= max;
+}
+
+/** 例：3／不限制 或 3/10 */
+export function participantsCountLabel(
+  participantCount: number,
+  max: number,
+): string {
+  if (isUnlimitedParticipants(max)) return `${participantCount}／不限制`;
+  return `${participantCount}/${max}`;
+}

@@ -6,10 +6,15 @@ import useSWR from "swr";
 import { PaceSelect } from "@/components/PaceSelect";
 import { canUseCustomLocation } from "@/lib/rbac";
 import { apiErrorMessage } from "@/lib/api-errors";
-import { snapPaceToStep } from "@/lib/format";
+import { snapPaceToStep, UNLIMITED_PARTICIPANTS } from "@/lib/format";
 import type { PwaLocation, UserRole } from "@/types/database";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+const CAPACITY_OPTIONS = [
+  UNLIMITED_PARTICIPANTS,
+  ...Array.from({ length: 49 }, (_, i) => i + 2),
+];
 
 export default function NewRunPage() {
   const router = useRouter();
@@ -30,7 +35,7 @@ export default function NewRunPage() {
   const [distance, setDistance] = useState(10);
   const [paceMin, setPaceMin] = useState(300);
   const [paceMax, setPaceMax] = useState(360);
-  const [maxParticipants, setMaxParticipants] = useState(10);
+  const [maxParticipants, setMaxParticipants] = useState(UNLIMITED_PARTICIPANTS);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -191,14 +196,17 @@ export default function NewRunPage() {
 
         <label className="text-sm text-emerald-100/80">
           名額
-          <input
-            type="number"
-            min={2}
-            max={50}
+          <select
             value={maxParticipants}
             onChange={(e) => setMaxParticipants(Number(e.target.value))}
-            className="mt-1 w-full rounded-md border border-emerald-800/60 bg-transparent px-3 py-2"
-          />
+            className="mt-1 w-full rounded-md border border-emerald-800/60 bg-[#0c1812] px-3 py-2"
+          >
+            {CAPACITY_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n >= UNLIMITED_PARTICIPANTS ? "不限制" : `${n} 人`}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="text-sm text-emerald-100/80">
