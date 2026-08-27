@@ -34,6 +34,7 @@ export default function RunDetailPage() {
   const [rollCallOpen, setRollCallOpen] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, AttendanceMark>>({});
   const [completeBusy, setCompleteBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const run = data?.run;
   const me = data?.me;
@@ -85,6 +86,25 @@ export default function RunDetailPage() {
     }
     setComment("");
     await mutate();
+  }
+
+  async function copyRunLink() {
+    const url = `${window.location.origin}/runs/${id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setLinkCopied(true);
+    window.setTimeout(() => setLinkCopied(false), 2000);
   }
 
   async function forcePush() {
@@ -212,6 +232,13 @@ export default function RunDetailPage() {
             name={run.host?.display_name}
           />
         </p>
+        <button
+          type="button"
+          onClick={() => void copyRunLink()}
+          className="shrink-0 rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs text-emerald-200"
+        >
+          {linkCopied ? "已複製連結" : "複製活動連結"}
+        </button>
       </div>
 
       <dl className="mt-6 grid grid-cols-2 gap-3 text-sm text-emerald-100/70">
