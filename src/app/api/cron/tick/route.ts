@@ -11,7 +11,8 @@ function authorizeCron(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return process.env.NODE_ENV !== "production";
   const auth = request.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
+  if (auth === `Bearer ${secret}`) return true;
+  return request.headers.get("x-cron-secret") === secret;
 }
 
 type ReminderKind = "1d" | "6h" | "1h";
@@ -46,7 +47,7 @@ function pickReminder(run: {
   const msUntil = new Date(run.start_time).getTime() - now;
   if (msUntil <= 0) return null;
 
-  // 門檻補送：Cron 即使每日一次，進入該時段且尚未送過就發
+  // 門檻補送：每小時 Cron 掃描，進入該時段且尚未送過就發
   if (!run.start_reminder_sent_at && msUntil <= HOUR) return "1h";
   if (!run.reminder_6h_sent_at && msUntil <= 6 * HOUR) return "6h";
   if (!run.reminder_1d_sent_at && msUntil <= DAY) return "1d";
