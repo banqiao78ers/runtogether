@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** @deprecated 請改用 /api/users/[id]/follow */
+/** 追蹤跑友（對方開團時優先收到推播） */
 export async function POST(_request: Request, ctx: Ctx) {
   try {
     const user = await requireUser();

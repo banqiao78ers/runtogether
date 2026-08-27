@@ -171,6 +171,20 @@ export function notifyUsers(userIds: string[], payload: PushPayload): void {
   })();
 }
 
+/** 有人報名加入約跑時通知主揪（Fire-and-forget） */
+export function notifyHostParticipantJoined(opts: {
+  runId: string;
+  hostId: string;
+  joinerName: string;
+  startTime: string;
+}): void {
+  notifyUsers([opts.hostId], {
+    title: "有人加入你的約跑",
+    body: `${opts.joinerName} · ${formatDateTime(opts.startTime)}`,
+    url: `/runs/${opts.runId}`,
+  });
+}
+
 export type BroadcastPushResult = {
   total: number;
   sent: number;

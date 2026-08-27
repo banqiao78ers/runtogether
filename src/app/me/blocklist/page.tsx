@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import useSWR from "swr";
 
@@ -10,10 +11,11 @@ export default function BlocklistPage() {
   const [userId, setUserId] = useState("");
 
   async function add() {
+    if (!userId.trim()) return;
     await fetch("/api/blocklist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ blocked_user_id: userId }),
+      body: JSON.stringify({ blocked_user_id: userId.trim() }),
     });
     setUserId("");
     await mutate();
@@ -26,16 +28,19 @@ export default function BlocklistPage() {
 
   return (
     <main className="px-5 py-8">
-      <h1 className="text-xl font-bold text-white">主揪黑名單</h1>
+      <Link href="/me" className="text-sm text-emerald-300/70">
+        ← 我的
+      </Link>
+      <h1 className="mt-4 text-xl font-bold text-white">我的黑名單</h1>
       <p className="mt-2 text-sm text-emerald-100/50">
-        被列入者無法報名你開的團。請貼上對方使用者 UUID。
+        被列入者無法報名你開的團。建議至活動詳情頁點擊跑友姓名，進入個人頁加入黑名單。
       </p>
       <div className="mt-6 flex gap-2">
         <input
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
           className="flex-1 rounded-md border border-emerald-800/60 bg-transparent px-3 py-2 text-sm"
-          placeholder="對方使用者編號（UUID）"
+          placeholder="進階：使用者 UUID（一般不需填寫）"
         />
         <button
           type="button"
@@ -56,7 +61,12 @@ export default function BlocklistPage() {
               key={b.id}
               className="flex items-center justify-between text-sm text-emerald-100/70"
             >
-              <span>{b.blocked?.display_name || b.blocked_user_id}</span>
+              <Link
+                href={`/users/${b.blocked_user_id}`}
+                className="text-emerald-200"
+              >
+                {b.blocked?.display_name || b.blocked_user_id}
+              </Link>
               <button
                 type="button"
                 onClick={() => void remove(b.blocked_user_id)}
@@ -66,6 +76,9 @@ export default function BlocklistPage() {
               </button>
             </li>
           ),
+        )}
+        {(data?.blocklist ?? []).length === 0 && data && (
+          <li className="text-sm text-emerald-100/40">黑名單是空的</li>
         )}
       </ul>
     </main>

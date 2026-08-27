@@ -1,6 +1,7 @@
 import { jsonOk, jsonError, handleRouteError } from "@/lib/api";
 import { requireUser } from "@/lib/auth/user";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { notifyHostParticipantJoined } from "@/lib/push";
 import type { RegisterRpcResult } from "@/types/database";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -27,6 +28,21 @@ export async function POST(_request: Request, ctx: Ctx) {
       const code = result?.code || "FAILED";
       const status = code === "FULL" || code === "TIME_OVERLAP" ? 409 : 400;
       return jsonError(code, status);
+    }
+
+    const { data: run } = await supabase
+      .from("pwa_runs")
+      .select("host_id, start_time")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (run?.host_id && run.host_id !== user.id) {
+      notifyHostParticipantJoined({
+        runId: id,
+        hostId: run.host_id,
+        joinerName: user.display_name || "跑友",
+        startTime: run.start_time,
+      });
     }
 
     return jsonOk({ ok: true });

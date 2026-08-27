@@ -33,13 +33,17 @@ export async function POST(request: Request, ctx: Ctx) {
       .eq("run_id", id)
       .in("status", ["registered", "arrived"]);
 
-    for (const p of parts ?? []) {
-      const mark = body.attendance?.[p.user_id];
-      const status =
-        mark ??
-        (p.status === "arrived" || p.user_id === run.host_id
-          ? "attended"
-          : "attended");
+    const pending = parts ?? [];
+    if (pending.length > 0) {
+      const attendance = body.attendance ?? {};
+      const missing = pending.filter((p) => !attendance[p.user_id]);
+      if (missing.length > 0) {
+        return jsonError("ATTENDANCE_INCOMPLETE");
+      }
+    }
+
+    for (const p of pending) {
+      const status = body.attendance![p.user_id];
       await supabase
         .from("pwa_run_participants")
         .update({ status })

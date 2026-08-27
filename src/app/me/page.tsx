@@ -94,6 +94,16 @@ export default function MePage() {
           </>
         )}
         <li>
+          <Link href={`/users/${data.id}`} className="text-emerald-300">
+            我的活動紀錄
+          </Link>
+        </li>
+        <li>
+          <Link href="/me/follows" className="text-emerald-300">
+            我的追蹤
+          </Link>
+        </li>
+        <li>
           <Link href="/me/blocklist" className="text-emerald-300">
             我的黑名單
           </Link>

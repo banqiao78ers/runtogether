@@ -1,12 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { formatDateTime, paceLabel, participantStatusLabel, runStatusLabel, isRunFull, participantsCountLabel } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/api-errors";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+type Participant = {
+  id: string;
+  user_id: string;
+  status: string;
+  user?: { id: string; display_name: string };
+};
+
+type AttendanceMark = "attended" | "no_show";
 
 export default function RunDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,29 +30,14 @@ export default function RunDetailPage() {
   const [comment, setComment] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [delayMins, setDelayMins] = useState(10);
-  const [followBusy, setFollowBusy] = useState(false);
   const [forcePushBusy, setForcePushBusy] = useState(false);
+  const [rollCallOpen, setRollCallOpen] = useState(false);
+  const [attendance, setAttendance] = useState<Record<string, AttendanceMark>>({});
+  const [completeBusy, setCompleteBusy] = useState(false);
 
   const run = data?.run;
   const me = data?.me;
-  const following = !!me?.following_host;
   const isAdmin = me?.role === "admin";
-
-  async function toggleFollow() {
-    if (!run?.host?.id || followBusy) return;
-    setFollowBusy(true);
-    setMsg(null);
-    const res = await fetch(`/api/hosts/${run.host.id}/follow`, {
-      method: following ? "DELETE" : "POST",
-    });
-    setFollowBusy(false);
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      setMsg(apiErrorMessage(j.error, "追蹤失敗"));
-      return;
-    }
-    await mutate();
-  }
 
   async function act(path: string, body?: unknown) {
     setMsg(null);
@@ -112,6 +107,68 @@ export default function RunDetailPage() {
     );
   }
 
+  const participants = (data?.participants ?? []) as Participant[];
+
+  const rollCallTargets = useMemo(
+    () =>
+      participants.filter((p) =>
+        ["registered", "arrived"].includes(p.status),
+      ),
+    [participants],
+  );
+
+  function openRollCall() {
+    const initial: Record<string, AttendanceMark> = {};
+    for (const p of rollCallTargets) {
+      initial[p.user_id] = p.status === "arrived" ? "attended" : "no_show";
+    }
+    setAttendance(initial);
+    setRollCallOpen(true);
+    setMsg(null);
+  }
+
+  function setAllAttended() {
+    const next: Record<string, AttendanceMark> = {};
+    for (const p of rollCallTargets) {
+      next[p.user_id] = "attended";
+    }
+    setAttendance(next);
+  }
+
+  async function submitRollCall() {
+    if (completeBusy) return;
+    const missing = rollCallTargets.filter((p) => !attendance[p.user_id]);
+    if (missing.length > 0) {
+      setMsg("請為每位報名者選擇出席或未到");
+      return;
+    }
+    const attended = rollCallTargets.filter(
+      (p) => attendance[p.user_id] === "attended",
+    ).length;
+    const noShow = rollCallTargets.length - attended;
+    const ok = window.confirm(
+      `確認結案？\n出席 ${attended} 人、未到 ${noShow} 人`,
+    );
+    if (!ok) return;
+
+    setCompleteBusy(true);
+    setMsg(null);
+    const res = await fetch(`/api/runs/${id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attendance }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setCompleteBusy(false);
+    if (!res.ok) {
+      setMsg(apiErrorMessage(json.error));
+      return;
+    }
+    setRollCallOpen(false);
+    await mutate();
+    setMsg("點名結案完成");
+  }
+
   if (isLoading || !run) {
     return (
       <main className="px-5 py-10 text-sm text-emerald-100/50">載入中…</main>
@@ -150,24 +207,13 @@ export default function RunDetailPage() {
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="text-sm text-emerald-100/70">
           主揪{" "}
-          <span className="text-emerald-100">
-            {run.host?.display_name || "跑友"}
-          </span>
-        </p>
-        {me && !isHost && (
-          <button
-            type="button"
-            onClick={() => void toggleFollow()}
-            className={`shrink-0 rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 ${
-              following
-                ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
-                : "border-emerald-800/60 text-emerald-100/70"
-            }`}
-            disabled={followBusy}
+          <Link
+            href={`/users/${run.host?.id ?? run.host_id}`}
+            className="text-emerald-100 underline decoration-emerald-700/50 underline-offset-2"
           >
-            {following ? "已追蹤" : "追蹤主揪"}
-          </button>
-        )}
+            {run.host?.display_name || "跑友"}
+          </Link>
+        </p>
       </div>
 
       <dl className="mt-6 grid grid-cols-2 gap-3 text-sm text-emerald-100/70">
@@ -268,13 +314,105 @@ export default function RunDetailPage() {
                 延期廣播
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => void act("complete", {})}
-              className="h-11 rounded-lg bg-emerald-400 font-semibold text-emerald-950"
-            >
-              結案點名
-            </button>
+            {!rollCallOpen ? (
+              <button
+                type="button"
+                onClick={openRollCall}
+                className="h-11 rounded-lg bg-emerald-400 font-semibold text-emerald-950"
+              >
+                結案點名
+              </button>
+            ) : (
+              <div className="rounded-lg border border-emerald-700/50 bg-emerald-950/40 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium text-emerald-200">
+                    點名結案
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={setAllAttended}
+                    className="text-xs text-emerald-300 underline"
+                  >
+                    全部出席
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-emerald-100/45">
+                  請確認每位報名者是否出席，已到達者預設為出席。
+                </p>
+                {rollCallTargets.length === 0 ? (
+                  <p className="mt-4 text-sm text-emerald-100/50">
+                    目前無待點名報名者，可直接結案。
+                  </p>
+                ) : (
+                  <ul className="mt-4 space-y-3">
+                    {rollCallTargets.map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex items-center justify-between gap-2 text-sm"
+                      >
+                        <span className="text-emerald-100/80">
+                          {p.user?.display_name || "跑友"}
+                          <span className="ml-2 text-xs text-emerald-100/40">
+                            {participantStatusLabel(p.status)}
+                          </span>
+                        </span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAttendance((prev) => ({
+                                ...prev,
+                                [p.user_id]: "attended",
+                              }))
+                            }
+                            className={`rounded px-2 py-1 text-xs ${
+                              attendance[p.user_id] === "attended"
+                                ? "bg-emerald-400 text-emerald-950"
+                                : "border border-emerald-700/60 text-emerald-100/60"
+                            }`}
+                          >
+                            出席
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAttendance((prev) => ({
+                                ...prev,
+                                [p.user_id]: "no_show",
+                              }))
+                            }
+                            className={`rounded px-2 py-1 text-xs ${
+                              attendance[p.user_id] === "no_show"
+                                ? "bg-rose-400/90 text-rose-950"
+                                : "border border-emerald-700/60 text-emerald-100/60"
+                            }`}
+                          >
+                            未到
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRollCallOpen(false)}
+                    className="flex-1 rounded-lg border border-emerald-700/60 py-2 text-sm text-emerald-100/70"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={completeBusy}
+                    onClick={() => void submitRollCall()}
+                    className="flex-1 rounded-lg bg-emerald-400 py-2 text-sm font-semibold text-emerald-950 disabled:opacity-50"
+                  >
+                    {completeBusy ? "結案中…" : "確認結案"}
+                  </button>
+                </div>
+              </div>
+            )}
             <input
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
@@ -315,18 +453,28 @@ export default function RunDetailPage() {
         <h2 className="text-sm font-medium text-emerald-200/80">
           報名者（{data.participant_count}）
         </h2>
+        <p className="mt-1 text-xs text-emerald-100/40">
+          點擊姓名查看活動紀錄
+        </p>
         <ul className="mt-3 space-y-2">
-          {(data.participants ?? []).map(
-            (p: {
-              id: string;
-              status: string;
-              user?: { display_name: string };
-            }) => (
+          {participants.map((p) => {
+            const isRunHost = p.user_id === run.host_id;
+            return (
               <li key={p.id} className="text-sm text-emerald-100/70">
-                {p.user?.display_name || "跑友"} · {participantStatusLabel(p.status)}
+                <Link
+                  href={`/users/${p.user_id}`}
+                  className="text-emerald-200 underline decoration-emerald-700/50 underline-offset-2"
+                >
+                  {p.user?.display_name || "跑友"}
+                </Link>
+                {isRunHost && (
+                  <span className="ml-1 text-xs text-emerald-300/60">（主揪）</span>
+                )}
+                {" · "}
+                {participantStatusLabel(p.status)}
               </li>
-            ),
-          )}
+            );
+          })}
         </ul>
       </section>
 

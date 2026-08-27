@@ -23,6 +23,7 @@ const API_ERROR_ZH: Record<string, string> = {
   DELAY_TOTAL_LIMIT: "累計延期已達上限",
   CANCELLED: "活動已取消",
   ALREADY_COMPLETED: "活動已結案",
+  ATTENDANCE_INCOMPLETE: "請完成所有報名者的點名後再結案",
   NOT_CANCELLED: "活動尚未取消",
   HOST_EXEMPT: "此主揪免於惡意取消投票",
   NOT_PARTICIPANT: "僅報名者可投票",
