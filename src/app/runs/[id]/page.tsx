@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { formatDateTime, paceLabel, participantStatusLabel, runStatusLabel, isRunFull, participantsCountLabel } from "@/lib/format";
 import { apiErrorMessage } from "@/lib/api-errors";
+import { MemberNameLink } from "@/components/MemberNameLink";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -205,14 +205,12 @@ export default function RunDetailPage() {
       )}
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="text-sm text-emerald-100/70">
-          主揪{" "}
-          <Link
-            href={`/users/${run.host?.id ?? run.host_id}`}
-            className="text-emerald-100 underline decoration-emerald-700/50 underline-offset-2"
-          >
-            {run.host?.display_name || "跑友"}
-          </Link>
+        <p className="flex flex-wrap items-center gap-2 text-sm text-emerald-100/70">
+          <span>主揪</span>
+          <MemberNameLink
+            userId={run.host?.id ?? run.host_id}
+            name={run.host?.display_name}
+          />
         </p>
       </div>
 
@@ -454,24 +452,25 @@ export default function RunDetailPage() {
           報名者（{data.participant_count}）
         </h2>
         <p className="mt-1 text-xs text-emerald-100/40">
-          點擊姓名查看活動紀錄
+          點姓名可查看對方活動紀錄與追蹤／黑名單
         </p>
         <ul className="mt-3 space-y-2">
           {participants.map((p) => {
             const isRunHost = p.user_id === run.host_id;
             return (
-              <li key={p.id} className="text-sm text-emerald-100/70">
-                <Link
-                  href={`/users/${p.user_id}`}
-                  className="text-emerald-200 underline decoration-emerald-700/50 underline-offset-2"
-                >
-                  {p.user?.display_name || "跑友"}
-                </Link>
+              <li
+                key={p.id}
+                className="flex flex-wrap items-center gap-2 text-sm text-emerald-100/70"
+              >
+                <MemberNameLink
+                  userId={p.user_id}
+                  name={p.user?.display_name}
+                />
                 {isRunHost && (
-                  <span className="ml-1 text-xs text-emerald-300/60">（主揪）</span>
+                  <span className="text-xs text-emerald-300/60">主揪</span>
                 )}
-                {" · "}
-                {participantStatusLabel(p.status)}
+                <span className="text-emerald-100/40">·</span>
+                <span>{participantStatusLabel(p.status)}</span>
               </li>
             );
           })}
@@ -485,13 +484,16 @@ export default function RunDetailPage() {
             (c: {
               id: string;
               content: string;
+              user_id: string;
               user?: { display_name: string };
             }) => (
               <li key={c.id} className="border-b border-emerald-900/40 pb-2 text-sm">
-                <span className="text-emerald-300/70">
-                  {c.user?.display_name}
-                </span>
-                <p className="text-emerald-100/80">{c.content}</p>
+                <MemberNameLink
+                  userId={c.user_id}
+                  name={c.user?.display_name}
+                  className="mb-1"
+                />
+                <p className="mt-1 text-emerald-100/80">{c.content}</p>
               </li>
             ),
           )}

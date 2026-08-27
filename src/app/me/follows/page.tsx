@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import useSWR from "swr";
+import { MemberNameLink } from "@/components/MemberNameLink";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -33,9 +34,10 @@ export default function FollowsPage() {
               key={f.id}
               className="flex items-center justify-between text-sm text-emerald-100/70"
             >
-              <Link href={`/users/${f.host_id}`} className="text-emerald-200">
-                {f.user?.display_name || "跑友"}
-              </Link>
+              <MemberNameLink
+                userId={f.host_id}
+                name={f.user?.display_name}
+              />
               <button
                 type="button"
                 onClick={() => void unfollow(f.host_id)}

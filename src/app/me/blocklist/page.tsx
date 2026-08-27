@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import useSWR from "swr";
+import { MemberNameLink } from "@/components/MemberNameLink";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -61,12 +62,10 @@ export default function BlocklistPage() {
               key={b.id}
               className="flex items-center justify-between text-sm text-emerald-100/70"
             >
-              <Link
-                href={`/users/${b.blocked_user_id}`}
-                className="text-emerald-200"
-              >
-                {b.blocked?.display_name || b.blocked_user_id}
-              </Link>
+              <MemberNameLink
+                userId={b.blocked_user_id}
+                name={b.blocked?.display_name}
+              />
               <button
                 type="button"
                 onClick={() => void remove(b.blocked_user_id)}

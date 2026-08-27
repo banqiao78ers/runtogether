@@ -5,6 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import useSWR from "swr";
 import { apiErrorMessage } from "@/lib/api-errors";
+import {
+  ActivityHistoryList,
+  ActivityStatsGrid,
+} from "@/components/ActivityHistory";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -75,7 +79,7 @@ export default function UserProfilePage() {
     );
   }
 
-  const { user, stats, viewer } = data;
+  const { user, stats, history = [], viewer } = data;
 
   return (
     <main className="px-5 py-8">
@@ -111,33 +115,24 @@ export default function UserProfilePage() {
       )}
 
       <section className="mt-8">
-        <h2 className="text-sm font-medium text-emerald-200/80">活動紀錄</h2>
-        <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
-          <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-3 py-4">
-            <dt className="text-xs text-emerald-100/40">主揪</dt>
-            <dd className="mt-1 text-2xl font-bold text-white">
-              {stats.host_count}
-            </dd>
-            <dd className="text-xs text-emerald-100/45">次</dd>
-          </div>
-          <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-3 py-4">
-            <dt className="text-xs text-emerald-100/40">跟團</dt>
-            <dd className="mt-1 text-2xl font-bold text-white">
-              {stats.join_count}
-            </dd>
-            <dd className="text-xs text-emerald-100/45">次</dd>
-          </div>
-          <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-3 py-4">
-            <dt className="text-xs text-emerald-100/40">缺席</dt>
-            <dd className="mt-1 text-2xl font-bold text-white">
-              {stats.no_show_count}
-            </dd>
-            <dd className="text-xs text-emerald-100/45">次</dd>
-          </div>
-        </dl>
+        <h2 className="text-sm font-medium text-emerald-200/80">活動統計</h2>
+        <div className="mt-4">
+          <ActivityStatsGrid
+            hostCount={stats.host_count}
+            joinCount={stats.join_count}
+            noShowCount={stats.no_show_count}
+          />
+        </div>
         <p className="mt-3 text-xs text-emerald-100/35">
           統計僅含已結案活動；跟團不含自己主揪的場次。
         </p>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-medium text-emerald-200/80">活動歷程</h2>
+        <div className="mt-4">
+          <ActivityHistoryList items={history} />
+        </div>
       </section>
 
       {msg && <p className="mt-4 text-sm text-amber-300">{msg}</p>}

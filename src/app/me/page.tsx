@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { PushRegister } from "@/components/PushRegister";
 import { InstallApp } from "@/components/InstallApp";
+import {
+  ActivityHistoryList,
+  ActivityStatsGrid,
+} from "@/components/ActivityHistory";
 import { paceLabel, roleLabel } from "@/lib/format";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -12,6 +16,10 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 export default function MePage() {
   const router = useRouter();
   const { data, error } = useSWR("/api/auth/me", fetcher);
+  const { data: profile } = useSWR(
+    data?.id ? `/api/users/${data.id}` : null,
+    fetcher,
+  );
 
   if (error || data?.error === "UNAUTHORIZED") {
     return (
@@ -27,6 +35,9 @@ export default function MePage() {
   if (!data) {
     return <main className="px-5 py-10 text-emerald-100/50">載入中…</main>;
   }
+
+  const stats = profile?.stats;
+  const history = profile?.history ?? [];
 
   return (
     <main className="px-5 py-8">
@@ -57,6 +68,31 @@ export default function MePage() {
           </dd>
         </div>
       </dl>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-medium text-emerald-200/80">活動統計</h2>
+        <div className="mt-4">
+          {stats ? (
+            <ActivityStatsGrid
+              hostCount={stats.host_count}
+              joinCount={stats.join_count}
+              noShowCount={stats.no_show_count}
+            />
+          ) : (
+            <p className="text-sm text-emerald-100/40">載入中…</p>
+          )}
+        </div>
+        <p className="mt-3 text-xs text-emerald-100/35">
+          統計僅含已結案活動；跟團不含自己主揪的場次。
+        </p>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-medium text-emerald-200/80">活動歷程</h2>
+        <div className="mt-4">
+          <ActivityHistoryList items={history} />
+        </div>
+      </section>
 
       <div className="mt-8 space-y-4">
         <InstallApp />
@@ -93,11 +129,6 @@ export default function MePage() {
             </li>
           </>
         )}
-        <li>
-          <Link href={`/users/${data.id}`} className="text-emerald-300">
-            我的活動紀錄
-          </Link>
-        </li>
         <li>
           <Link href="/me/follows" className="text-emerald-300">
             我的追蹤

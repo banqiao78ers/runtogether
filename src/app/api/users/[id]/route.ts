@@ -1,7 +1,7 @@
 import { jsonOk, jsonError, handleRouteError } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/user";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { getUserRunStats } from "@/lib/user-stats";
+import { getUserRunHistory, getUserRunStats } from "@/lib/user-stats";
 import { paceLabel, roleLabel } from "@/lib/format";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -21,7 +21,10 @@ export async function GET(_request: Request, ctx: Ctx) {
     if (error || !user) return jsonError("USER_NOT_FOUND", 404);
     if (user.is_banned) return jsonError("USER_NOT_FOUND", 404);
 
-    const stats = await getUserRunStats(id);
+    const [stats, history] = await Promise.all([
+      getUserRunStats(id),
+      getUserRunHistory(id),
+    ]);
 
     let isFollowing = false;
     let isBlocked = false;
@@ -59,6 +62,7 @@ export async function GET(_request: Request, ctx: Ctx) {
             : null,
       },
       stats,
+      history,
       viewer: viewer
         ? {
             is_self: isSelf,
