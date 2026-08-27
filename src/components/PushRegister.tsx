@@ -75,6 +75,7 @@ export function PushRegister({ guideOnly = false }: Props) {
   const [inApp, setInApp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const ios = isIosDevice();
@@ -213,6 +214,7 @@ export function PushRegister({ guideOnly = false }: Props) {
 
   const canEnablePush = status === "on" || status === "off";
   const iosNeedsInstall = device === "ios" && !standalone;
+  const showGuides = status !== "on" || guideOpen;
   const deviceLabel =
     device === "ios"
       ? "目前裝置：iPhone／iPad"
@@ -235,67 +237,86 @@ export function PushRegister({ guideOnly = false }: Props) {
         )}
       </div>
 
-      <p className="text-xs text-emerald-300/80">{deviceLabel}</p>
-
-      {inApp && (
-        <p className="rounded-md bg-amber-400/10 px-3 py-2 text-amber-200">
-          偵測到 App 內建瀏覽器。請用右上角選單「在瀏覽器開啟」，再用
-          Chrome／Safari 操作推播。
+      {status === "on" && !guideOnly && (
+        <p className="text-xs text-emerald-100/45">
+          已可接收開團推播。另需已設定配速偏好才會收到配速匹配推播；追蹤主揪則不受配速限制。
         </p>
       )}
 
-      {/* 兩個平台教學都顯示，目前裝置那塊較醒目 */}
-      <div
-        className={`space-y-2 rounded-md px-3 py-3 ${
-          device === "ios"
-            ? "border border-emerald-400/40 bg-emerald-400/10"
-            : "border border-emerald-900/50 bg-black/20"
-        }`}
-      >
-        <p className="font-medium text-emerald-200/90">
-          iPhone／iPad 設定
-          {device === "ios" ? "（你的裝置）" : ""}
-        </p>
-        <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
-          <li>請用 Safari 開啟本站（勿用 LINE 內建瀏覽器）</li>
-          <li>系統需 iOS 16.4 或更新版本</li>
-          <li>
-            點底部分享按鈕（方框＋向上箭頭）→ 往下找「加入主畫面」
-            （若沒有，點「編輯動作」開啟）
-          </li>
-          <li>從主畫面圖示開啟 App（不是 Safari 分頁）</li>
-          <li>到「我的」點「開啟推播通知」並允許</li>
-        </ol>
-        {device === "ios" && iosNeedsInstall && (
-          <p className="text-amber-200/90">
-            目前還在瀏覽器分頁中。請先加入主畫面，否則無法收到推播。
-          </p>
-        )}
-      </div>
+      {showGuides && (
+        <>
+          <p className="text-xs text-emerald-300/80">{deviceLabel}</p>
 
-      <div
-        className={`space-y-2 rounded-md px-3 py-3 ${
-          device !== "ios"
-            ? "border border-emerald-400/40 bg-emerald-400/10"
-            : "border border-emerald-900/50 bg-black/20"
-        }`}
-      >
-        <p className="font-medium text-emerald-200/90">
-          Android／電腦 設定
-          {device !== "ios" ? "（你的裝置）" : ""}
-        </p>
-        {status === "unsupported" && device !== "ios" ? (
-          <p className="text-emerald-100/65">
-            此瀏覽器不支援網頁推播。請改用 Chrome 開啟本站後再試。
-          </p>
-        ) : (
-          <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
-            <li>建議使用 Chrome 開啟本站</li>
-            <li>點下方「開啟推播通知」並允許通知</li>
-            <li>（選用）可「加入主畫面」方便之後開啟</li>
-          </ol>
-        )}
-      </div>
+          {inApp && (
+            <p className="rounded-md bg-amber-400/10 px-3 py-2 text-amber-200">
+              偵測到 App 內建瀏覽器。請用右上角選單「在瀏覽器開啟」，再用
+              Chrome／Safari 操作推播。
+            </p>
+          )}
+
+          <div
+            className={`space-y-2 rounded-md px-3 py-3 ${
+              device === "ios"
+                ? "border border-emerald-400/40 bg-emerald-400/10"
+                : "border border-emerald-900/50 bg-black/20"
+            }`}
+          >
+            <p className="font-medium text-emerald-200/90">
+              iPhone／iPad 設定
+              {device === "ios" ? "（你的裝置）" : ""}
+            </p>
+            <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
+              <li>請用 Safari 開啟本站（勿用 LINE 內建瀏覽器）</li>
+              <li>系統需 iOS 16.4 或更新版本</li>
+              <li>
+                點底部分享按鈕（方框＋向上箭頭）→ 往下找「加入主畫面」
+                （若沒有，點「編輯動作」開啟）
+              </li>
+              <li>從主畫面圖示開啟 App（不是 Safari 分頁）</li>
+              <li>到「我的」點「開啟推播通知」並允許</li>
+            </ol>
+            {device === "ios" && iosNeedsInstall && (
+              <p className="text-amber-200/90">
+                目前還在瀏覽器分頁中。請先加入主畫面，否則無法收到推播。
+              </p>
+            )}
+          </div>
+
+          <div
+            className={`space-y-2 rounded-md px-3 py-3 ${
+              device !== "ios"
+                ? "border border-emerald-400/40 bg-emerald-400/10"
+                : "border border-emerald-900/50 bg-black/20"
+            }`}
+          >
+            <p className="font-medium text-emerald-200/90">
+              Android／電腦 設定
+              {device !== "ios" ? "（你的裝置）" : ""}
+            </p>
+            {status === "unsupported" && device !== "ios" ? (
+              <p className="text-emerald-100/65">
+                此瀏覽器不支援網頁推播。請改用 Chrome 開啟本站後再試。
+              </p>
+            ) : (
+              <ol className="list-decimal space-y-1.5 pl-5 text-emerald-100/65">
+                <li>建議使用 Chrome 開啟本站</li>
+                <li>點下方「開啟推播通知」並允許通知</li>
+                <li>（選用）可「加入主畫面」方便之後開啟</li>
+              </ol>
+            )}
+          </div>
+        </>
+      )}
+
+      {status === "on" && !guideOnly && (
+        <button
+          type="button"
+          onClick={() => setGuideOpen((v) => !v)}
+          className="text-xs text-emerald-300/80 underline underline-offset-2"
+        >
+          {guideOpen ? "收合設定說明" : "查看設定說明"}
+        </button>
+      )}
 
       {error && (
         <p
@@ -331,7 +352,7 @@ export function PushRegister({ guideOnly = false }: Props) {
         </p>
       )}
 
-      {!guideOnly && (
+      {!guideOnly && status !== "on" && (
         <p className="text-xs text-emerald-100/45">
           另需已設定配速偏好，才會收到符合區間的開團推播；追蹤主揪則不受配速限制。
         </p>

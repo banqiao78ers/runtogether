@@ -13,6 +13,7 @@ export default async function LoginPage({
     config: "伺服器尚未完成 LINE 設定",
   };
   const message = params.error ? errorMap[params.error] || "登入失敗" : null;
+  const allowDevLogin = process.env.NODE_ENV !== "production";
 
   return (
     <main className="relative flex flex-1 flex-col justify-center px-6 py-16">
@@ -35,6 +36,35 @@ export default async function LoginPage({
       >
         使用 LINE 登入
       </a>
+
+      {allowDevLogin && (
+        <div className="mt-8 space-y-3 rounded-lg border border-amber-500/30 bg-amber-400/5 p-4">
+          <p className="text-xs font-medium text-amber-200/90">
+            本機開發：略過 LINE（僅 development）
+          </p>
+          <div className="flex flex-col gap-2">
+            <a
+              href="/api/auth/dev-login?as=member"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-400/15 text-sm font-medium text-emerald-100"
+            >
+              測試登入 · 一般會員
+            </a>
+            <a
+              href="/api/auth/dev-login?as=super"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-teal-500/40 bg-teal-400/12 text-sm font-medium text-teal-100"
+            >
+              測試登入 · 超級會員
+            </a>
+            <a
+              href="/api/auth/dev-login?as=admin"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-amber-500/40 bg-amber-400/12 text-sm font-medium text-amber-100"
+            >
+              測試登入 · 管理員
+            </a>
+          </div>
+        </div>
+      )}
+
       <Link href="/" className="mt-6 text-sm text-emerald-200/50">
         先逛逛活動列表
       </Link>

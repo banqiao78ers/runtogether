@@ -99,51 +99,63 @@ export default function MePage() {
         <PushRegister />
       </div>
 
-      <ul className="mt-10 space-y-3 text-sm">
-        <li>
-          <Link href="/onboarding/preference" className="text-emerald-300">
-            修改配速偏好
+      <div className="mt-10 grid grid-cols-2 gap-3">
+        {(
+          [
+            {
+              href: "/onboarding/preference",
+              label: "修改配速偏好",
+              tone: "border-emerald-400/50 bg-emerald-400/20 text-emerald-50",
+            },
+            {
+              href: "/me/follows",
+              label: "我的追蹤",
+              tone: "border-emerald-500/40 bg-emerald-500/15 text-emerald-100",
+            },
+            {
+              href: "/me/blocklist",
+              label: "我的黑名單",
+              tone: "border-emerald-700/50 bg-emerald-900/40 text-emerald-100/85",
+            },
+            ...(data.role === "admin"
+              ? [
+                  {
+                    href: "/admin/users",
+                    label: "管理會員角色",
+                    tone: "border-emerald-300/45 bg-emerald-300/18 text-emerald-50",
+                  },
+                  {
+                    href: "/admin/locations",
+                    label: "管理集合點",
+                    tone: "border-emerald-600/45 bg-emerald-800/35 text-emerald-100",
+                  },
+                  {
+                    href: "/admin/appeals",
+                    label: "審核停權申訴",
+                    tone: "border-emerald-500/35 bg-emerald-950/50 text-emerald-200/90",
+                  },
+                  {
+                    href: "/admin/push",
+                    label: "推播測試",
+                    tone: "border-emerald-400/40 bg-emerald-600/20 text-emerald-100",
+                  },
+                ]
+              : []),
+          ] as { href: string; label: string; tone: string }[]
+        ).map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex aspect-square items-center justify-center rounded-xl border px-3 text-center text-sm font-medium leading-snug ${item.tone}`}
+          >
+            {item.label}
           </Link>
-        </li>
-        {data.role === "admin" && (
-          <>
-            <li>
-              <Link href="/admin/users" className="text-emerald-300">
-                管理會員角色
-              </Link>
-            </li>
-            <li>
-              <Link href="/admin/locations" className="text-emerald-300">
-                管理集合點
-              </Link>
-            </li>
-            <li>
-              <Link href="/admin/appeals" className="text-emerald-300">
-                審核停權申訴
-              </Link>
-            </li>
-            <li>
-              <Link href="/admin/push" className="text-emerald-300">
-                推播測試
-              </Link>
-            </li>
-          </>
-        )}
-        <li>
-          <Link href="/me/follows" className="text-emerald-300">
-            我的追蹤
-          </Link>
-        </li>
-        <li>
-          <Link href="/me/blocklist" className="text-emerald-300">
-            我的黑名單
-          </Link>
-        </li>
-      </ul>
+        ))}
+      </div>
 
       <button
         type="button"
-        className="mt-12 text-sm text-emerald-100/40"
+        className="mt-8 w-full rounded-xl border border-emerald-900/60 py-3 text-sm text-emerald-100/45"
         onClick={async () => {
           await fetch("/api/auth/logout", { method: "POST" });
           router.push("/login");
