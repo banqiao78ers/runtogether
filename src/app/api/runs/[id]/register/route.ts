@@ -2,6 +2,7 @@ import { jsonOk, jsonError, handleRouteError } from "@/lib/api";
 import { requireUser } from "@/lib/auth/user";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { notifyHostParticipantJoined } from "@/lib/push";
+import { sendCatchUpReminder } from "@/lib/run-reminders";
 import type { RegisterRpcResult } from "@/types/database";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -43,6 +44,10 @@ export async function POST(_request: Request, ctx: Ctx) {
         joinerName: user.display_name || "跑友",
         startTime: run.start_time,
       });
+    }
+
+    if (run?.start_time) {
+      sendCatchUpReminder(user.id, run.start_time, id);
     }
 
     return jsonOk({ ok: true });

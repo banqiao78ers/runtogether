@@ -1,11 +1,16 @@
 import { NextRequest } from "next/server";
 import { jsonOk, jsonError } from "@/lib/api";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { notifyUsers } from "@/lib/push";
+import { notifyUsersAsync } from "@/lib/push";
 import { runEndTime } from "@/lib/format";
+import {
+  pickCronReminder,
+  REMINDER_COPY,
+  sendRunReminderAsync,
+} from "@/lib/run-reminders";
 
-const HOUR = 60 * 60_000;
-const DAY = 24 * HOUR;
+const DAY = 24 * 60 * 60_000;
+const AUTO_COMPLETE_AFTER_MS = DAY;
 
 function authorizeCron(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -15,45 +20,6 @@ function authorizeCron(request: NextRequest) {
   return request.headers.get("x-cron-secret") === secret;
 }
 
-type ReminderKind = "1d" | "6h" | "1h";
-
-const REMINDER_COPY: Record<
-  ReminderKind,
-  { title: string; body: string; column: string }
-> = {
-  "1d": {
-    title: "約跑提醒（一天前）",
-    body: "活動約一天後開始，請預留時間",
-    column: "reminder_1d_sent_at",
-  },
-  "6h": {
-    title: "約跑提醒（六小時前）",
-    body: "活動約六小時後開始，記得準備",
-    column: "reminder_6h_sent_at",
-  },
-  "1h": {
-    title: "約跑提醒（一小時前）",
-    body: "活動約一小時後開始，記得準時集合",
-    column: "start_reminder_sent_at",
-  },
-};
-
-function pickReminder(run: {
-  start_time: string;
-  reminder_1d_sent_at: string | null;
-  reminder_6h_sent_at: string | null;
-  start_reminder_sent_at: string | null;
-}, now: number): ReminderKind | null {
-  const msUntil = new Date(run.start_time).getTime() - now;
-  if (msUntil <= 0) return null;
-
-  // 門檻補送：每小時 Cron 掃描，進入該時段且尚未送過就發
-  if (!run.start_reminder_sent_at && msUntil <= HOUR) return "1h";
-  if (!run.reminder_6h_sent_at && msUntil <= 6 * HOUR) return "6h";
-  if (!run.reminder_1d_sent_at && msUntil <= DAY) return "1d";
-  return null;
-}
-
 export async function GET(request: NextRequest) {
   if (!authorizeCron(request)) return jsonError("UNAUTHORIZED", 401);
 
@@ -61,7 +27,7 @@ export async function GET(request: NextRequest) {
   const now = Date.now();
   const horizon = new Date(now + DAY).toISOString();
 
-  const { data: upcoming } = await supabase
+  const { data: upcoming, error: upcomingError } = await supabase
     .from("pwa_runs")
     .select(
       "id, start_time, reminder_1d_sent_at, reminder_6h_sent_at, start_reminder_sent_at",
@@ -71,10 +37,18 @@ export async function GET(request: NextRequest) {
     .gt("start_time", new Date(now).toISOString())
     .lte("start_time", horizon);
 
+  if (upcomingError) {
+    console.error(upcomingError);
+    return jsonError("DB", 500, { detail: upcomingError.message });
+  }
+
   const counts = { "1d": 0, "6h": 0, "1h": 0 };
+  let push_sent = 0;
+  let push_failed = 0;
+  let push_skipped_no_sub = 0;
 
   for (const run of upcoming ?? []) {
-    const kind = pickReminder(run, now);
+    const kind = pickCronReminder(run, now);
     if (!kind) continue;
 
     const { data: parts } = await supabase
@@ -83,19 +57,25 @@ export async function GET(request: NextRequest) {
       .eq("run_id", run.id)
       .in("status", ["registered", "arrived"]);
 
+    const userIds = (parts ?? []).map((p) => p.user_id);
     const copy = REMINDER_COPY[kind];
-    notifyUsers((parts ?? []).map((p) => p.user_id), {
-      title: copy.title,
-      body: copy.body,
-      url: `/runs/${run.id}`,
-    });
+    const result = await sendRunReminderAsync(userIds, kind, run.id);
 
-    await supabase
-      .from("pwa_runs")
-      .update({ [copy.column]: new Date().toISOString() })
-      .eq("id", run.id);
+    push_sent += result.sent;
+    if (result.eligible === 0) {
+      push_skipped_no_sub += userIds.length;
+    } else if (result.sent < result.eligible) {
+      push_failed += result.eligible - result.sent;
+    }
 
-    counts[kind] += 1;
+    // 無推播訂閱可標記已送；有訂閱但全失敗則留待下輪重試
+    if (result.eligible === 0 || result.sent > 0) {
+      await supabase
+        .from("pwa_runs")
+        .update({ [copy.column]: new Date().toISOString() })
+        .eq("id", run.id);
+      counts[kind] += 1;
+    }
   }
 
   const { data: finished } = await supabase
@@ -115,19 +95,33 @@ export async function GET(request: NextRequest) {
     if (end > now) continue;
 
     if (!run.completion_reminder_sent_at) {
-      notifyUsers([run.host_id], {
+      const result = await notifyUsersAsync([run.host_id], {
         title: "請結案點名",
         body: "活動已結束，請至詳情頁完成點名結案",
         url: `/runs/${run.id}`,
       });
-      await supabase
-        .from("pwa_runs")
-        .update({ completion_reminder_sent_at: new Date().toISOString() })
-        .eq("id", run.id);
-      reminded += 1;
+
+      push_sent += result.sent;
+      if (result.eligible > 0 && result.sent < result.eligible) {
+        push_failed += result.eligible - result.sent;
+      }
+
+      if (result.eligible === 0 || result.sent > 0) {
+        await supabase
+          .from("pwa_runs")
+          .update({ completion_reminder_sent_at: new Date().toISOString() })
+          .eq("id", run.id);
+        reminded += 1;
+      }
     }
 
-    if (now - end >= 48 * 60 * 60 * 1000) {
+    if (now - end >= AUTO_COMPLETE_AFTER_MS) {
+      const { data: pendingParts } = await supabase
+        .from("pwa_run_participants")
+        .select("user_id")
+        .eq("run_id", run.id)
+        .in("status", ["registered", "arrived"]);
+
       await supabase
         .from("pwa_runs")
         .update({ status: "completed" })
@@ -137,6 +131,24 @@ export async function GET(request: NextRequest) {
         .update({ status: "attended" })
         .eq("run_id", run.id)
         .in("status", ["registered", "arrived"]);
+
+      const notifyIds = [
+        run.host_id,
+        ...(pendingParts ?? []).map((p) => p.user_id),
+      ];
+      const result = await notifyUsersAsync([...new Set(notifyIds)], {
+        title: "活動已自動結案",
+        body: "主揪未於 24 小時內點名，系統已自動結案並標記出席",
+        url: `/runs/${run.id}`,
+      });
+      push_sent += result.sent;
+      if (result.eligible > 0 && result.sent < result.eligible) {
+        push_failed += result.eligible - result.sent;
+      }
+      if (result.eligible === 0 && notifyIds.length > 0) {
+        push_skipped_no_sub += notifyIds.length;
+      }
+
       autoCompleted += 1;
     }
   }
@@ -147,5 +159,8 @@ export async function GET(request: NextRequest) {
     reminders_1h: counts["1h"],
     completion_reminders: reminded,
     auto_completed: autoCompleted,
+    push_sent,
+    push_failed,
+    push_skipped_no_sub,
   });
 }

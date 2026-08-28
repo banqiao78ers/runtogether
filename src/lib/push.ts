@@ -27,10 +27,11 @@ export async function sendPushToSubscription(
   subscription: PushSubscriptionJSON,
   payload: PushPayload,
   userId?: string,
-): Promise<void> {
+): Promise<boolean> {
   ensureVapid();
   try {
     await webpush.sendNotification(subscription, JSON.stringify(payload));
+    return true;
   } catch (err: unknown) {
     const status = (err as { statusCode?: number })?.statusCode;
     if (status === 410 && userId) {
@@ -40,7 +41,42 @@ export async function sendPushToSubscription(
         .update({ push_subscription: null })
         .eq("id", userId);
     }
+    return false;
   }
+}
+
+export type NotifyUsersResult = {
+  eligible: number;
+  sent: number;
+};
+
+export async function notifyUsersAsync(
+  userIds: string[],
+  payload: PushPayload,
+): Promise<NotifyUsersResult> {
+  if (userIds.length === 0) return { eligible: 0, sent: 0 };
+
+  const supabase = getSupabaseAdmin();
+  const { data: users } = await supabase
+    .from("pwa_users")
+    .select("id, push_subscription")
+    .in("id", userIds)
+    .not("push_subscription", "is", null);
+
+  const eligible = users?.length ?? 0;
+  if (eligible === 0) return { eligible: 0, sent: 0 };
+
+  const results = await Promise.all(
+    (users ?? []).map((u) =>
+      sendPushToSubscription(
+        u.push_subscription as PushSubscriptionJSON,
+        payload,
+        u.id,
+      ),
+    ),
+  );
+
+  return { eligible, sent: results.filter(Boolean).length };
 }
 
 export function notifyRunCreated(run: {
@@ -146,29 +182,9 @@ export function notifyRunCreated(run: {
 }
 
 export function notifyUsers(userIds: string[], payload: PushPayload): void {
-  void (async () => {
-    try {
-      if (userIds.length === 0) return;
-      const supabase = getSupabaseAdmin();
-      const { data: users } = await supabase
-        .from("pwa_users")
-        .select("id, push_subscription")
-        .in("id", userIds)
-        .not("push_subscription", "is", null);
-
-      await Promise.all(
-        (users ?? []).map((u) =>
-          sendPushToSubscription(
-            u.push_subscription as PushSubscriptionJSON,
-            payload,
-            u.id,
-          ),
-        ),
-      );
-    } catch {
-      // ignore
-    }
-  })();
+  void notifyUsersAsync(userIds, payload).catch(() => {
+    // ignore background errors
+  });
 }
 
 /** 有人報名加入約跑時通知主揪（Fire-and-forget） */

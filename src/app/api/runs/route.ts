@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/user";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCustomLocation } from "@/lib/rbac";
 import { notifyRunCreated } from "@/lib/push";
+import { sendCatchUpReminder } from "@/lib/run-reminders";
 import { runEndTime, UNLIMITED_PARTICIPANTS } from "@/lib/format";
 
 const BANQIAO_DISTRICT = "\u677f\u6a4b\u5340"; // 板橋區
@@ -168,6 +169,7 @@ export async function POST(request: Request) {
     });
 
     notifyRunCreated(run);
+    sendCatchUpReminder(user.id, run.start_time, run.id);
 
     return jsonOk({ run }, { status: 201 });
   } catch (err) {
