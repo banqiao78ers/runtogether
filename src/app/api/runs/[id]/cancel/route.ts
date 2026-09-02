@@ -2,7 +2,7 @@ import { jsonOk, jsonError, handleRouteError } from "@/lib/api";
 import { requireUser } from "@/lib/auth/user";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isExemptFromCancelPenalty } from "@/lib/rbac";
-import { notifyUsers } from "@/lib/push";
+import { notifyRunCancelled } from "@/lib/push";
 import type { UserRole } from "@/types/database";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -46,14 +46,12 @@ export async function POST(request: Request, ctx: Ctx) {
       .in("status", ["registered", "arrived"])
       .neq("user_id", run.host_id);
 
-    notifyUsers(
-      (parts ?? []).map((p) => p.user_id),
-      {
-        title: "約跑已取消",
-        body: reason,
-        url: `/runs/${id}`,
-      },
-    );
+    await notifyRunCancelled({
+      runId: id,
+      startTime: run.start_time,
+      reason,
+      participantUserIds: (parts ?? []).map((p) => p.user_id),
+    });
 
     const hostRole = (run.host as { role?: UserRole } | null)?.role ?? "member";
     return jsonOk({

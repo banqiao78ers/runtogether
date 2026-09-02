@@ -201,6 +201,20 @@ export function notifyHostParticipantJoined(opts: {
   });
 }
 
+/** 主揪取消整場活動時通知報名者（不含主揪） */
+export async function notifyRunCancelled(opts: {
+  runId: string;
+  startTime: string;
+  reason: string;
+  participantUserIds: string[];
+}): Promise<NotifyUsersResult> {
+  return notifyUsersAsync(opts.participantUserIds, {
+    title: "約跑已取消",
+    body: `${formatDateTime(opts.startTime)} · 取消原因：${opts.reason}`,
+    url: `/runs/${opts.runId}`,
+  });
+}
+
 export type BroadcastPushResult = {
   total: number;
   sent: number;
