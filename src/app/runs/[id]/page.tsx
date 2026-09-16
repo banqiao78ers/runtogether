@@ -34,7 +34,11 @@ export default function RunDetailPage() {
   const [rollCallOpen, setRollCallOpen] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, AttendanceMark>>({});
   const [completeBusy, setCompleteBusy] = useState(false);
+  const [correctBusyId, setCorrectBusyId] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  /** 與 API 一致：主揪結案後 72 小時內可修正 */
+  const CORRECTION_WINDOW_MS = 72 * 60 * 60 * 1000;
 
   const run = data?.run;
   const me = data?.me;
@@ -189,6 +193,33 @@ export default function RunDetailPage() {
     setMsg("點名結案完成");
   }
 
+  async function correctAttendance(
+    userId: string,
+    status: AttendanceMark,
+    name: string,
+  ) {
+    if (correctBusyId) return;
+    const label = status === "attended" ? "出席" : "未到";
+    const ok = window.confirm(`將「${name}」改為${label}？`);
+    if (!ok) return;
+
+    setCorrectBusyId(userId);
+    setMsg(null);
+    const res = await fetch(`/api/runs/${id}/correct-attendance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, status }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setCorrectBusyId(null);
+    if (!res.ok) {
+      setMsg(apiErrorMessage(json.error));
+      return;
+    }
+    await mutate();
+    setMsg(`已將「${name}」改為${label}`);
+  }
+
   if (isLoading || !run) {
     return (
       <main className="px-5 py-10 text-sm text-emerald-100/50">載入中…</main>
@@ -205,6 +236,13 @@ export default function RunDetailPage() {
   const joined = !!me?.participation;
   const closed = ["completed", "cancelled"].includes(run.status);
   const canArrive = new Date(run.start_time).getTime() <= Date.now();
+  const withinCorrectionWindow =
+    run.status === "completed" &&
+    Date.now() - new Date(run.updated_at).getTime() <= CORRECTION_WINDOW_MS;
+  const canCorrectAttendance =
+    run.status === "completed" &&
+    (isHost || isAdmin) &&
+    (isAdmin || withinCorrectionWindow);
 
   return (
     <main className="px-5 py-8">
@@ -481,9 +519,18 @@ export default function RunDetailPage() {
         <p className="mt-1 text-xs text-emerald-100/40">
           點姓名可查看對方活動紀錄與追蹤／黑名單
         </p>
+        {canCorrectAttendance && (
+          <p className="mt-1 text-xs text-amber-200/70">
+            {isAdmin && !withinCorrectionWindow
+              ? "管理員可隨時修正出席／未到"
+              : "結案後 72 小時內可修正誤標的出席／未到"}
+          </p>
+        )}
         <ul className="mt-3 space-y-2">
           {participants.map((p) => {
             const isRunHost = p.user_id === run.host_id;
+            const name = p.user?.display_name || "跑友";
+            const correctable = ["attended", "no_show"].includes(p.status);
             return (
               <li
                 key={p.id}
@@ -498,6 +545,34 @@ export default function RunDetailPage() {
                 )}
                 <span className="text-emerald-100/40">·</span>
                 <span>{participantStatusLabel(p.status)}</span>
+                {canCorrectAttendance && correctable && (
+                  <span className="ml-auto flex gap-1">
+                    <button
+                      type="button"
+                      disabled={
+                        correctBusyId === p.user_id || p.status === "attended"
+                      }
+                      onClick={() =>
+                        void correctAttendance(p.user_id, "attended", name)
+                      }
+                      className="rounded px-2 py-0.5 text-xs disabled:opacity-40 border border-emerald-700/60 text-emerald-200"
+                    >
+                      改出席
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        correctBusyId === p.user_id || p.status === "no_show"
+                      }
+                      onClick={() =>
+                        void correctAttendance(p.user_id, "no_show", name)
+                      }
+                      className="rounded px-2 py-0.5 text-xs disabled:opacity-40 border border-rose-700/50 text-rose-200/80"
+                    >
+                      改未到
+                    </button>
+                  </span>
+                )}
               </li>
             );
           })}
