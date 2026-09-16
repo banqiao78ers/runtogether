@@ -120,6 +120,11 @@ export default function MePage() {
             ...(data.role === "admin"
               ? [
                   {
+                    href: "/admin/runs",
+                    label: "管理活動紀錄",
+                    tone: "border-emerald-200/40 bg-emerald-400/15 text-emerald-50",
+                  },
+                  {
                     href: "/admin/users",
                     label: "管理會員角色",
                     tone: "border-emerald-300/45 bg-emerald-300/18 text-emerald-50",

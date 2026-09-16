@@ -28,6 +28,10 @@ export function canBroadcastPush(role: UserRole): boolean {
   return role === "admin";
 }
 
+export function canManageRuns(role: UserRole): boolean {
+  return role === "admin";
+}
+
 export function needsOnboarding(
   paceMin: number | null | undefined,
   paceMax: number | null | undefined,

@@ -148,3 +148,28 @@ export function participantsCountLabel(
   if (isUnlimitedParticipants(max)) return `${participantCount}／不限制`;
   return `${participantCount}/${max}`;
 }
+
+/** ISO → datetime-local 值（Asia/Taipei 牆鐘） */
+export function toTaipeiDatetimeLocal(iso: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(new Date(iso))
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value]),
+  ) as Record<string, string>;
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+/** datetime-local（視為台北時間）→ ISO UTC */
+export function taipeiDatetimeLocalToIso(local: string): string {
+  const normalized = local.length === 16 ? `${local}:00` : local;
+  return new Date(`${normalized}+08:00`).toISOString();
+}
