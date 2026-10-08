@@ -219,21 +219,41 @@ export function RoutePlannerMap({
     [syncMarkers, syncRoute],
   );
 
+  const enableTouchPan = useCallback((map: MapLibreMap) => {
+    try {
+      map.dragPan.enable();
+      map.scrollZoom.enable();
+      map.boxZoom.enable();
+      map.keyboard.enable();
+      map.doubleClickZoom.enable();
+      map.touchZoomRotate.enable();
+      map.touchZoomRotate.disableRotation();
+      map.dragRotate.disable();
+      map.touchPitch.disable();
+      map.cooperativeGestures.disable();
+
+      const canvas = map.getCanvas();
+      canvas.style.touchAction = "none";
+      const host = map.getCanvasContainer();
+      host.style.touchAction = "none";
+      host.style.cursor = "grab";
+      host.classList.add("maplibregl-interactive");
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const kickResize = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     try {
       map.resize();
-      map.dragPan.enable();
-      map.touchZoomRotate.enable();
-      map.touchZoomRotate.disableRotation();
-      map.dragRotate.disable();
-      map.touchPitch.disable();
+      enableTouchPan(map);
       map.triggerRepaint();
     } catch {
       // ignore
     }
-  }, []);
+  }, [enableTouchPan]);
 
   const fitRouteBounds = useCallback((map: MapLibreMap) => {
     const g = geometryRef.current;
@@ -308,16 +328,19 @@ export function RoutePlannerMap({
         zoom,
         attributionControl: { compact: true },
         fadeDuration: 0,
+        interactive: true,
         dragPan: true,
+        scrollZoom: true,
+        boxZoom: true,
+        doubleClickZoom: true,
         touchZoomRotate: true,
         dragRotate: false,
         pitchWithRotate: false,
-        doubleClickZoom: true,
+        // 單指拖曳；true 時手機需兩指才能滑
+        cooperativeGestures: false,
       });
       mapRef.current = map;
-      map.dragRotate.disable();
-      map.touchPitch.disable();
-      map.touchZoomRotate.disableRotation();
+      enableTouchPan(map);
 
       map.addControl(new NavigationControl({ showCompass: false }), "top-right");
       if (!readOnly) {
@@ -447,11 +470,11 @@ export function RoutePlannerMap({
   return (
     <div
       ref={wrapRef}
-      className="relative h-full w-full min-h-[240px] bg-[#1a2e24]"
+      className="relative h-full w-full min-h-[240px] overflow-hidden overscroll-none bg-[#1a2e24] [touch-action:none]"
     >
       <div
         ref={containerRef}
-        className="absolute inset-0 h-full w-full [&_.maplibregl-canvas]:outline-none [&_.maplibregl-ctrl-top-right]:top-3 [&_.maplibregl-ctrl-top-right]:right-2 [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90"
+        className="absolute inset-0 h-full w-full [touch-action:none] [&_.maplibregl-canvas]:outline-none [&_.maplibregl-canvas]:[touch-action:none] [&_.maplibregl-canvas-container]:cursor-grab [&_.maplibregl-canvas-container]:[touch-action:none] [&_.maplibregl-ctrl-top-right]:top-3 [&_.maplibregl-ctrl-top-right]:right-2 [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90"
         role="application"
         aria-label={
           readOnly ? "路線分享地圖" : "路線規劃地圖，點擊設定起點與途經點"

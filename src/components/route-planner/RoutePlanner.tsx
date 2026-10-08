@@ -556,7 +556,7 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
           : null;
 
   return (
-    <div className="relative flex h-full min-h-[480px] flex-col">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 p-3 pr-14">
         <div className="pointer-events-auto max-w-[calc(100%-0.5rem)]">
           <div className="flex flex-wrap items-center gap-2">
@@ -679,8 +679,8 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
         )}
       </div>
 
-      <div className="relative min-h-0 flex-1">
-        <div className="absolute inset-0">
+      <div className="relative min-h-0 flex-1 [touch-action:none]">
+        <div className="absolute inset-0 [touch-action:none]">
           <RoutePlannerMap
             center={center}
             zoom={mapZoom}
