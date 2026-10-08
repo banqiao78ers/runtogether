@@ -679,8 +679,8 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
         )}
       </div>
 
-      <div className="relative min-h-0 flex-1 [touch-action:none]">
-        <div className="absolute inset-0 [touch-action:none]">
+      <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-0">
           <RoutePlannerMap
             center={center}
             zoom={mapZoom}
@@ -688,8 +688,7 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
             geometry={geometry}
             onMapClick={addWaypoint}
             onViewChange={(view) => {
-              setCenter({ lat: view.lat, lng: view.lng });
-              setMapZoom(view.zoom);
+              // 只寫 localStorage，避免拖曳時 setState 重渲染打斷手勢
               writeLastMapView(view);
             }}
             flyTo={flyTo}

@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * 圖釘 = HTML Marker（DOM）
- * 軌跡 = MapLibre GeoJSON line layer（WebGL，不擋觸控）
- * 禁止再用全螢幕／canvas-container SVG 畫線——手機上即使 pointer-events:none 仍常吃掉拖曳。
+ * 圖釘 = HTML Marker；軌跡 = GeoJSON line（不擋拖曳）。
+ * 禁止：全螢幕 SVG、idle 裡反覆 resize／重建 marker（會弄壞拖曳）。
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -33,7 +32,6 @@ type Props = {
   geometry: LineStringGeometry | null;
   onMapClick?: (point: LatLng) => void;
   onViewChange?: (view: MapViewChange) => void;
-  /** 可帶 zoom；未帶則至少維持目前縮放（下限 14） */
   flyTo?: (LatLng & { zoom?: number }) | null;
   readOnly?: boolean;
   fitToRoute?: boolean;
@@ -145,10 +143,8 @@ export function RoutePlannerMap({
       if (!ensureRouteLayer(map)) return;
       const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
       if (!src) return;
-
       try {
         const g = geometryRef.current;
-        // 一律實線（不設 dasharray，避免部分裝置畫不出線）
         if (g && g.coordinates.length >= 2) {
           src.setData({
             type: "FeatureCollection",
@@ -156,7 +152,6 @@ export function RoutePlannerMap({
           });
           return;
         }
-
         const pts = waypointsRef.current;
         if (pts.length >= 2) {
           src.setData({
@@ -176,7 +171,6 @@ export function RoutePlannerMap({
           });
           return;
         }
-
         src.setData(emptyCollection());
       } catch (err) {
         console.warn("[RoutePlannerMap] syncRoute", err);
@@ -200,11 +194,13 @@ export function RoutePlannerMap({
                 ? "end"
                 : "via";
         const el = createPinElement(kind, i + 1);
-        markersRef.current.push(
-          new Marker({ element: el, anchor: "bottom" })
-            .setLngLat([p.lng, p.lat])
-            .addTo(map),
-        );
+        const marker = new Marker({ element: el, anchor: "bottom" })
+          .setLngLat([p.lng, p.lat])
+          .addTo(map);
+        // MapLibre 外層 .maplibregl-marker 也要放行拖曳
+        const root = marker.getElement();
+        root.style.pointerEvents = "none";
+        markersRef.current.push(marker);
       });
     } catch (err) {
       console.warn("[RoutePlannerMap] syncMarkers", err);
@@ -218,42 +214,6 @@ export function RoutePlannerMap({
     },
     [syncMarkers, syncRoute],
   );
-
-  const enableTouchPan = useCallback((map: MapLibreMap) => {
-    try {
-      map.dragPan.enable();
-      map.scrollZoom.enable();
-      map.boxZoom.enable();
-      map.keyboard.enable();
-      map.doubleClickZoom.enable();
-      map.touchZoomRotate.enable();
-      map.touchZoomRotate.disableRotation();
-      map.dragRotate.disable();
-      map.touchPitch.disable();
-      map.cooperativeGestures.disable();
-
-      const canvas = map.getCanvas();
-      canvas.style.touchAction = "none";
-      const host = map.getCanvasContainer();
-      host.style.touchAction = "none";
-      host.style.cursor = "grab";
-      host.classList.add("maplibregl-interactive");
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const kickResize = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    try {
-      map.resize();
-      enableTouchPan(map);
-      map.triggerRepaint();
-    } catch {
-      // ignore
-    }
-  }, [enableTouchPan]);
 
   const fitRouteBounds = useCallback((map: MapLibreMap) => {
     const g = geometryRef.current;
@@ -290,16 +250,21 @@ export function RoutePlannerMap({
     fitDoneRef.current = true;
   }, []);
 
+  // Keep-Alive 顯示時只 resize 一次，不要重建 overlay
   useEffect(() => {
     if (!visible) return;
     const map = mapRef.current;
-    kickResize();
-    if (map?.isStyleLoaded()) applyOverlays(map);
-    const timers = [0, 80, 250].map((ms) => window.setTimeout(kickResize, ms));
-    return () => {
-      for (const t of timers) window.clearTimeout(t);
-    };
-  }, [visible, kickResize, applyOverlays]);
+    if (!map) return;
+    const t = window.setTimeout(() => {
+      try {
+        map.resize();
+        map.dragPan.enable();
+      } catch {
+        // ignore
+      }
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [visible]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -307,7 +272,6 @@ export function RoutePlannerMap({
 
     let cancelled = false;
     let map: MapLibreMap | null = null;
-    const timers: number[] = [];
 
     setMapReady(false);
     setMapError(null);
@@ -318,7 +282,6 @@ export function RoutePlannerMap({
       if (cancelled || !containerRef.current) return;
 
       containerRef.current.replaceChildren();
-
       ensureMapLibreWorker();
 
       map = new MapLibreMap({
@@ -333,14 +296,20 @@ export function RoutePlannerMap({
         scrollZoom: true,
         boxZoom: true,
         doubleClickZoom: true,
-        touchZoomRotate: true,
         dragRotate: false,
         pitchWithRotate: false,
-        // 單指拖曳；true 時手機需兩指才能滑
+        touchZoomRotate: true,
+        touchPitch: false,
         cooperativeGestures: false,
       });
       mapRef.current = map;
-      enableTouchPan(map);
+
+      // 保持預設 touch 類別（zoom+pan → touch-action:none），只關旋轉
+      map.dragRotate.disable();
+      map.touchPitch.disable();
+      map.touchZoomRotate.disableRotation();
+      map.cooperativeGestures.disable();
+      map.dragPan.enable();
 
       map.addControl(new NavigationControl({ showCompass: false }), "top-right");
       if (!readOnly) {
@@ -355,21 +324,19 @@ export function RoutePlannerMap({
 
       const afterReady = () => {
         if (cancelled || !map) return;
-        setMapError(null);
+        try {
+          map.resize();
+          map.dragPan.enable();
+        } catch {
+          // ignore
+        }
         applyOverlays(map);
-        kickResize();
         if (fitToRoute) fitRouteBounds(map);
+        setMapError(null);
         setMapReady(true);
       };
 
       map.on("load", afterReady);
-      map.on("idle", () => {
-        if (!cancelled) {
-          setMapReady(true);
-          kickResize();
-          if (map?.isStyleLoaded()) applyOverlays(map);
-        }
-      });
 
       map.on("dragstart", () => {
         dragMovedRef.current = true;
@@ -381,17 +348,15 @@ export function RoutePlannerMap({
         dragMovedRef.current = false;
       });
 
-      const emitView = () => {
+      map.on("moveend", () => {
         if (!map || readOnlyRef.current) return;
         const c = map.getCenter();
         const z = map.getZoom();
         if (viewSaveTimer.current) window.clearTimeout(viewSaveTimer.current);
         viewSaveTimer.current = window.setTimeout(() => {
           onViewChangeRef.current?.({ lat: c.lat, lng: c.lng, zoom: z });
-        }, 300);
-      };
-      map.on("moveend", emitView);
-      map.on("zoomend", emitView);
+        }, 400);
+      });
 
       map.on("click", (e: MapMouseEvent) => {
         if (readOnlyRef.current || dragMovedRef.current) return;
@@ -407,12 +372,9 @@ export function RoutePlannerMap({
           console.warn("[RoutePlannerMap] tile error", msg);
           return;
         }
-        // Worker／圖磚偶發錯誤不擋操作；僅在 style 完全起不來時提示
         if (/Worker failed to load/i.test(msg)) {
           console.error("[RoutePlannerMap] worker", msg);
-          setMapError(
-            "地圖引擎載入失敗，請強制重整。若持續發生請清除快取後重試。",
-          );
+          setMapError("地圖引擎載入失敗，請強制重整。");
           return;
         }
         if (map && !map.isStyleLoaded()) {
@@ -420,20 +382,32 @@ export function RoutePlannerMap({
         }
       });
 
-      timers.push(
-        window.setTimeout(() => {
-          if (!cancelled) setMapReady(true);
-        }, 4000),
-      );
+      window.setTimeout(() => {
+        if (!cancelled) setMapReady(true);
+      }, 4000);
     })();
 
-    const ro = new ResizeObserver(() => kickResize());
+    // 尺寸真的變了才 resize（debounce），避免 idle 風暴
+    let resizeTimer: number | null = null;
+    const ro = new ResizeObserver(() => {
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        const m = mapRef.current;
+        if (!m) return;
+        try {
+          m.resize();
+          m.dragPan.enable();
+        } catch {
+          // ignore
+        }
+      }, 100);
+    });
     ro.observe(el);
     if (wrapRef.current) ro.observe(wrapRef.current);
 
     return () => {
       cancelled = true;
-      for (const t of timers) window.clearTimeout(t);
+      if (resizeTimer) window.clearTimeout(resizeTimer);
       if (viewSaveTimer.current) window.clearTimeout(viewSaveTimer.current);
       ro.disconnect();
       for (const m of markersRef.current) m.remove();
@@ -470,12 +444,11 @@ export function RoutePlannerMap({
   return (
     <div
       ref={wrapRef}
-      className="relative h-full w-full min-h-[240px] overflow-hidden overscroll-none bg-[#1a2e24] [touch-action:none]"
+      className="relative h-full w-full min-h-[240px] overflow-hidden bg-[#1a2e24]"
     >
       <div
         ref={containerRef}
-        className="absolute inset-0 h-full w-full [touch-action:none] [&_.maplibregl-canvas]:outline-none [&_.maplibregl-canvas]:[touch-action:none] [&_.maplibregl-canvas-container]:cursor-grab [&_.maplibregl-canvas-container]:[touch-action:none] [&_.maplibregl-ctrl-top-right]:top-3 [&_.maplibregl-ctrl-top-right]:right-2 [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90"
-        role="application"
+        className="absolute inset-0 h-full w-full [&_.maplibregl-canvas]:outline-none [&_.maplibregl-ctrl-top-right]:top-3 [&_.maplibregl-ctrl-top-right]:right-2 [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90"
         aria-label={
           readOnly ? "路線分享地圖" : "路線規劃地圖，點擊設定起點與途經點"
         }

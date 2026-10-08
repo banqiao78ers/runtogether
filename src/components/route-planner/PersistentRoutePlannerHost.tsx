@@ -23,7 +23,7 @@ export function PersistentRoutePlannerHost() {
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 bottom-14 z-30 mx-auto flex w-full max-w-lg flex-col overflow-hidden overscroll-none bg-[#0f1f17] ${
+      className={`fixed inset-x-0 top-0 bottom-14 z-30 mx-auto flex w-full max-w-lg flex-col overflow-hidden bg-[#0f1f17] ${
         active
           ? "visible pointer-events-auto"
           : "invisible pointer-events-none"
