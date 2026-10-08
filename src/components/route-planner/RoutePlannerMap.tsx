@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   GeolocateControl,
   Map as MapLibreMap,
   Marker,
   NavigationControl,
-  type GeoJSONSource,
   type MapMouseEvent,
   type StyleSpecification,
 } from "maplibre-gl";
@@ -14,8 +13,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { LatLng, LineStringGeometry } from "@/lib/routing/types";
 
 /**
- * 預設用免金鑰 OSM raster（內嵌 style，不依賴第三方 style JSON／Carto）。
- * 若要向量底圖可設 NEXT_PUBLIC_MAP_STYLE_URL=https://tiles.openfreemap.org/styles/liberty
+ * 預設用免金鑰 OSM raster。
+ * 路線軌跡改以 SVG 疊加繪製（不依賴 GeoJSON line layer，避免偶發不顯示）。
  */
 const FREE_OSM_RASTER_STYLE: StyleSpecification = {
   version: 8,
@@ -32,9 +31,6 @@ const FREE_OSM_RASTER_STYLE: StyleSpecification = {
 };
 
 const CUSTOM_STYLE_URL = process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || "";
-
-const SOURCE_ID = "route-line";
-const LAYER_ID = "route-line-layer";
 
 type Props = {
   center: LatLng;
@@ -61,10 +57,42 @@ export function RoutePlannerMap({
   const geometryRef = useRef(geometry);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [pathD, setPathD] = useState("");
+  const [pathPreview, setPathPreview] = useState(false);
 
   onClickRef.current = onMapClick;
   waypointsRef.current = waypoints;
   geometryRef.current = geometry;
+
+  const routePoints = useCallback((): LatLng[] => {
+    const g = geometryRef.current;
+    if (g && g.coordinates.length >= 2) {
+      return g.coordinates.map(([lng, lat]) => ({ lat, lng }));
+    }
+    return waypointsRef.current;
+  }, []);
+
+  const redrawPath = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) {
+      setPathD("");
+      return;
+    }
+    const pts = routePoints();
+    if (pts.length < 2) {
+      setPathD("");
+      setPathPreview(false);
+      return;
+    }
+    const g = geometryRef.current;
+    setPathPreview(!(g && g.coordinates.length >= 2));
+
+    const projected = pts.map((p) => map.project([p.lng, p.lat]));
+    const d = projected
+      .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(" ");
+    setPathD(d);
+  }, [routePoints]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -97,48 +125,23 @@ export function RoutePlannerMap({
       "top-right",
     );
 
-    const ensureRouteLayer = () => {
-      if (cancelled) return;
-      if (!map.getSource(SOURCE_ID)) {
-        map.addSource(SOURCE_ID, {
-          type: "geojson",
-          data: emptyLine(),
-        });
-      }
-      if (!map.getLayer(LAYER_ID)) {
-        map.addLayer({
-          id: LAYER_ID,
-          type: "line",
-          source: SOURCE_ID,
-          layout: { "line-join": "round", "line-cap": "round" },
-          paint: {
-            "line-color": "#34d399",
-            "line-width": 5,
-            "line-opacity": 0.95,
-          },
-        });
-      }
-      syncRoute(map);
-      syncMarkers(map);
-      map.resize();
-    };
-
     map.on("load", () => {
       setMapError(null);
-      ensureRouteLayer();
+      syncMarkers(map);
+      redrawPath();
+      map.resize();
     });
 
     map.on("idle", () => {
-      if (!cancelled) setMapReady(true);
-    });
-
-    // setStyle／重建後若路線圖層消失，補回一次
-    map.on("styledata", () => {
-      if (!map.isStyleLoaded()) return;
-      if (!map.getSource(SOURCE_ID) || !map.getLayer(LAYER_ID)) {
-        ensureRouteLayer();
+      if (!cancelled) {
+        setMapReady(true);
+        redrawPath();
       }
     });
+
+    map.on("move", redrawPath);
+    map.on("zoom", redrawPath);
+    map.on("resize", redrawPath);
 
     map.on("error", (e) => {
       const msg = e.error?.message ?? "地圖載入失敗";
@@ -169,13 +172,17 @@ export function RoutePlannerMap({
 
     const ro = new ResizeObserver(() => {
       map.resize();
+      redrawPath();
     });
     ro.observe(el);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         map.resize();
-        requestAnimationFrame(() => map.resize());
+        requestAnimationFrame(() => {
+          map.resize();
+          redrawPath();
+        });
       }
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -183,8 +190,10 @@ export function RoutePlannerMap({
 
     requestAnimationFrame(() => map.resize());
     const t1 = window.setTimeout(() => map.resize(), 100);
-    const t2 = window.setTimeout(() => map.resize(), 500);
-    // 最長等待後仍顯示地圖區（避免一直卡在「載入中」）
+    const t2 = window.setTimeout(() => {
+      map.resize();
+      redrawPath();
+    }, 500);
     const t3 = window.setTimeout(() => {
       if (!cancelled) setMapReady(true);
     }, 4000);
@@ -217,54 +226,8 @@ export function RoutePlannerMap({
     const map = mapRef.current;
     if (!map) return;
     syncMarkers(map);
-    if (map.isStyleLoaded()) {
-      ensureSource(map);
-      syncRoute(map);
-    }
-  }, [waypoints, geometry]);
-
-  function ensureSource(map: MapLibreMap) {
-    if (!map.getSource(SOURCE_ID)) {
-      map.addSource(SOURCE_ID, { type: "geojson", data: emptyLine() });
-    }
-    if (!map.getLayer(LAYER_ID)) {
-      map.addLayer({
-        id: LAYER_ID,
-        type: "line",
-        source: SOURCE_ID,
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: {
-          "line-color": "#34d399",
-          "line-width": 5,
-          "line-opacity": 0.95,
-        },
-      });
-    }
-  }
-
-  function syncRoute(map: MapLibreMap) {
-    const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
-    if (!src) return;
-    const g = geometryRef.current;
-    if (g && g.coordinates.length >= 2) {
-      src.setData({ type: "Feature", properties: {}, geometry: g });
-      return;
-    }
-    // 貼路結果尚未回來時，先畫途經點直線預覽
-    const pts = waypointsRef.current;
-    if (pts.length >= 2) {
-      src.setData({
-        type: "Feature",
-        properties: {},
-        geometry: {
-          type: "LineString",
-          coordinates: pts.map((p) => [p.lng, p.lat] as [number, number]),
-        },
-      });
-      return;
-    }
-    src.setData(emptyLine());
-  }
+    redrawPath();
+  }, [waypoints, geometry, redrawPath]);
 
   function syncMarkers(map: MapLibreMap) {
     clearMarkers(markersRef);
@@ -294,6 +257,35 @@ export function RoutePlannerMap({
         role="application"
         aria-label="路線規劃地圖，點擊設定起點與途經點"
       />
+      {/* 軌跡疊加：與地圖同尺寸，跟隨 project() 座標 */}
+      <svg
+        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+        aria-hidden
+      >
+        {pathD ? (
+          <>
+            <path
+              d={pathD}
+              fill="none"
+              stroke="#042f2e"
+              strokeWidth={8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.35}
+            />
+            <path
+              d={pathD}
+              fill="none"
+              stroke="#34d399"
+              strokeWidth={5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={pathPreview ? "8 6" : undefined}
+              opacity={0.95}
+            />
+          </>
+        ) : null}
+      </svg>
       {!mapReady && !mapError && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[#1a2e24]/55">
           <p className="rounded-lg bg-[#0c1812]/90 px-3 py-2 text-sm text-emerald-100/80">
@@ -347,15 +339,4 @@ function createPinElement(
     "></div>
   </div>`;
   return el;
-}
-
-function emptyLine() {
-  return {
-    type: "Feature" as const,
-    properties: {},
-    geometry: {
-      type: "LineString" as const,
-      coordinates: [] as [number, number][],
-    },
-  };
 }
