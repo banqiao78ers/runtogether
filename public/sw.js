@@ -1,20 +1,29 @@
-const TILE_CACHE = "bq-map-tiles-v1";
+/** v2：不快取 opaque（會讓 MapLibre 讀圖磚 Failed to fetch (0)） */
+const TILE_CACHE = "bq-map-tiles-v2";
 const TILE_MAX_ENTRIES = 800;
 
-/** OpenStreetMap／常用 raster 圖磚（路線規劃底圖） */
 function isMapTileRequest(url) {
   if (url.protocol !== "https:") return false;
   const host = url.hostname;
   if (
     host === "tile.openstreetmap.org" ||
     host.endsWith(".tile.openstreetmap.org") ||
+    host === "tile.openstreetmap.de" ||
+    host.endsWith(".tile.openstreetmap.fr") ||
+    host === "a.tile.openstreetmap.fr" ||
+    host === "b.tile.openstreetmap.fr" ||
+    host === "c.tile.openstreetmap.fr" ||
     host === "tiles.openfreemap.org" ||
     host.endsWith(".openfreemap.org")
   ) {
     return true;
   }
-  // /{z}/{x}/{y}.png 形式
   return /\/\d+\/\d+\/\d+(\.png|\.jpg|\.jpeg|\.webp)?$/i.test(url.pathname);
+}
+
+function isUsableTileResponse(res) {
+  // MapLibre 需要可讀取的 CORS／basic 回應；opaque 會造成 AJAXError 0
+  return res && res.ok && (res.type === "basic" || res.type === "cors");
 }
 
 async function trimTileCache(cache) {
@@ -43,8 +52,7 @@ self.addEventListener("activate", (event) => {
 });
 
 /**
- * 圖磚：Cache First（命中快取不打網路）
- * 其餘請求不攔截，避免影響 App／API／推播
+ * 圖磚：可用快取優先；略過 opaque；失敗時直接網路（勿丟出阻斷）。
  */
 self.addEventListener("fetch", (event) => {
   const req = event.request;
@@ -62,12 +70,21 @@ self.addEventListener("fetch", (event) => {
     (async () => {
       const cache = await caches.open(TILE_CACHE);
       const cached = await cache.match(req, { ignoreVary: true });
-      if (cached) return cached;
+      if (cached && isUsableTileResponse(cached)) {
+        return cached;
+      }
+      // 清掉壞掉的 opaque 快取
+      if (cached) {
+        try {
+          await cache.delete(req);
+        } catch {
+          // ignore
+        }
+      }
 
       try {
         const res = await fetch(req);
-        // 成功或 opaque（no-cors 圖磚）都可入庫
-        if (res.ok || res.type === "opaque") {
+        if (isUsableTileResponse(res)) {
           try {
             await cache.put(req, res.clone());
             await trimTileCache(cache);
@@ -76,14 +93,14 @@ self.addEventListener("fetch", (event) => {
           }
         }
         return res;
-      } catch (err) {
-        // 離線時再試一次 match（忽略 search 差異）
+      } catch {
         const fallback = await cache.match(req, {
           ignoreSearch: true,
           ignoreVary: true,
         });
-        if (fallback) return fallback;
-        throw err;
+        if (fallback && isUsableTileResponse(fallback)) return fallback;
+        // 讓瀏覽器／MapLibre 自行處理失敗，不要拋出造成整頁卡死
+        return Response.error();
       }
     })(),
   );

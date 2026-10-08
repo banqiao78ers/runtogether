@@ -1,4 +1,5 @@
 import type { LatLng } from "./types";
+import { osmTileUrl } from "./map-style";
 
 /** Web Mercator → OSM tile 座標 */
 function latLngToTile(lat: number, lng: number, z: number) {
@@ -14,8 +15,7 @@ function latLngToTile(lat: number, lng: number, z: number) {
 const preloadedKeys = new Set<string>();
 
 /**
- * 輕量預載中心附近圖磚（配合 SW Cache First，重複造訪幾乎不耗流量）。
- * 同一 zoom／tile 區只預載一次（本分頁生命週期內）。
+ * 輕量預載（cors fetch，禁止 no-cors／opaque，否則會毒化 SW 快取）。
  */
 export function preloadOsmTiles(
   center: LatLng,
@@ -31,11 +31,10 @@ export function preloadOsmTiles(
 
   for (let dx = -radius; dx <= radius; dx++) {
     for (let dy = -radius; dy <= radius; dy++) {
-      const x = cx + dx;
-      const y = cy + dy;
-      const url = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
-      // 用 fetch 走 SW，才能寫進 Cache Storage；Image 預載不一定被攔截
-      void fetch(url, { mode: "no-cors", credentials: "omit" }).catch(() => {});
+      const url = osmTileUrl(z, cx + dx, cy + dy);
+      void fetch(url, { mode: "cors", credentials: "omit", cache: "force-cache" }).catch(
+        () => {},
+      );
     }
   }
 }

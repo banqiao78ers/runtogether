@@ -8,31 +8,14 @@ import {
   NavigationControl,
   type GeoJSONSource,
   type MapMouseEvent,
-  type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { buildOsmRasterStyle } from "@/lib/routing/map-style";
 import type { LatLng, LineStringGeometry } from "@/lib/routing/types";
 
 const SOURCE_ID = "bq-route-line";
 const LAYER_CASING = "bq-route-casing";
 const LAYER_LINE = "bq-route-line";
-
-/** 每次建圖新物件，避免 MapLibre 改壞共用 style */
-function buildOsmRasterStyle(): StyleSpecification {
-  return {
-    version: 8,
-    sources: {
-      osm: {
-        type: "raster",
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        attribution: "© OpenStreetMap contributors",
-        maxzoom: 19,
-      },
-    },
-    layers: [{ id: "osm", type: "raster", source: "osm" }],
-  };
-}
 
 type Props = {
   center: LatLng;
@@ -307,6 +290,14 @@ export function RoutePlannerMap({
 
       map.on("error", (e) => {
         const msg = e.error?.message ?? "地圖載入失敗";
+        // 單張圖磚失敗（AJAXError Failed to fetch）不擋整張地圖
+        const isTileFetch =
+          /Failed to fetch|AJAXError|tile\./i.test(msg) ||
+          /\/\d+\/\d+\/\d+\.png/i.test(msg);
+        if (isTileFetch) {
+          console.warn("[RoutePlannerMap] tile error", msg);
+          return;
+        }
         if (map && !map.isStyleLoaded()) {
           console.error("[RoutePlannerMap]", msg, e.error);
           setMapError(msg);
