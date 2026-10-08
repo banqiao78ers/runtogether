@@ -1,12 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import useSWR from "swr";
 import { PaceSelect } from "@/components/PaceSelect";
 import { canUseCustomLocation } from "@/lib/rbac";
 import { apiErrorMessage } from "@/lib/api-errors";
 import { snapPaceToStep, UNLIMITED_PARTICIPANTS } from "@/lib/format";
+import { ROUTE_DRAFT_KEY, type RouteDraft } from "@/lib/routing/types";
 import type { PwaLocation, UserRole } from "@/types/database";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -17,7 +19,16 @@ const CAPACITY_OPTIONS = [
 ];
 
 export default function NewRunPage() {
+  return (
+    <Suspense fallback={<main className="px-5 py-10 text-emerald-100/50">載入中…</main>}>
+      <NewRunForm />
+    </Suspense>
+  );
+}
+
+function NewRunForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: meData } = useSWR("/api/auth/me", fetcher);
   const { data: locData } = useSWR<{ locations: PwaLocation[] }>(
     "/api/locations",
@@ -39,6 +50,7 @@ export default function NewRunPage() {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fromRoute, setFromRoute] = useState(false);
 
   useEffect(() => {
     if (meData?.pace_min && meData?.pace_max) {
@@ -46,6 +58,37 @@ export default function NewRunPage() {
       setPaceMax(snapPaceToStep(meData.pace_max));
     }
   }, [meData]);
+
+  useEffect(() => {
+    let draft: RouteDraft | null = null;
+    try {
+      const raw = sessionStorage.getItem(ROUTE_DRAFT_KEY);
+      if (raw) {
+        draft = JSON.parse(raw) as RouteDraft;
+        sessionStorage.removeItem(ROUTE_DRAFT_KEY);
+      }
+    } catch {
+      // ignore
+    }
+
+    const qDistance = searchParams.get("distance_km");
+    const qDestination = searchParams.get("destination");
+
+    const nextDistance =
+      qDistance != null && Number.isFinite(Number(qDistance))
+        ? Number(qDistance)
+        : draft?.distance_km;
+    const nextDestination = qDestination ?? draft?.destination;
+
+    if (nextDistance != null && nextDistance > 0) {
+      setDistance(Math.round(nextDistance * 10) / 10);
+      setFromRoute(true);
+    }
+    if (nextDestination) {
+      setDestination(nextDestination);
+      setFromRoute(true);
+    }
+  }, [searchParams]);
 
   const banqiaoLocations = (locData?.locations ?? []).filter(
     (l) => l.district === "\u677f\u6a4b\u5340" || allowCustom,
@@ -95,6 +138,18 @@ export default function NewRunPage() {
           ? "可選固定點或自訂全台地點"
           : "一般會員僅能選擇板橋區固定集合點"}
       </p>
+      <Link
+        href="/routes/plan"
+        className="mt-3 inline-block text-sm text-emerald-300/90 underline-offset-2 hover:underline"
+      >
+        用地圖規劃路線 →
+      </Link>
+      {fromRoute && (
+        <p className="mt-2 text-xs text-emerald-300/70">
+          已套用路線規劃的距離
+          {!allowCustom ? "（集合點仍請選板橋固定點）" : ""}
+        </p>
+      )}
 
       <form onSubmit={(e) => void submit(e)} className="mt-6 flex flex-col gap-4">
         <label className="text-sm text-emerald-100/80">

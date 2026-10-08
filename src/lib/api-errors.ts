@@ -53,6 +53,15 @@ const API_ERROR_ZH: Record<string, string> = {
   VAPID_NOT_CONFIGURED: "伺服器尚未設定推播金鑰，請聯絡管理員",
   VAPID_INVALID: "伺服器推播金鑰格式錯誤，請聯絡管理員",
   SELF_NO_PUSH: "你尚未開啟推播，請先到「我的」開啟後再測試",
+  QUERY_REQUIRED: "請輸入搜尋關鍵字",
+  GEO_UPSTREAM: "地名搜尋服務暫時無法使用",
+  GEO_TIMEOUT: "地名搜尋逾時，請稍後再試",
+  POINTS_REQUIRED: "請至少選兩個途經點",
+  TOO_MANY_POINTS: "途經點過多，請減少後再試",
+  INVALID_POINTS: "途經點座標無效",
+  ROUTING_UPSTREAM: "路線服務暫時無法使用",
+  ROUTING_TIMEOUT: "路線計算逾時，請稍後再試",
+  ROUTING_FAILED: "找不到可行走路線，請調整途經點",
 };
 
 export function apiErrorMessage(code: unknown, fallback = "操作失敗"): string {

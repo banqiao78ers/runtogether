@@ -48,8 +48,13 @@ npm run dev
 | 路徑 | 說明 |
 |------|------|
 | `/` | 活動列表 |
+| `/routes/plan` | 路跑路線規劃（貼路、距離、GPX、套用開團） |
 | `/runs/new` | 開團 |
 | `/runs/[id]` | 詳情／報名／留言 |
 | `/me` | 個人與推播 |
 | `/admin/*` | 活動／地點／角色／申訴／推播 |
 | `/api/cron/tick` | 開跑提醒＋48h 自動結案 |
+
+## 路線規劃（選用 env）
+
+預設使用公開 OSRM foot（`routing.openstreetmap.de`）與 Nominatim、OpenFreeMap 圖磚，無需金鑰即可本機試用。正式環境建議自架或付費方案以避免 rate limit。詳見 `.env.example` 與 `docs/route_planner_dev_plan.md`。
