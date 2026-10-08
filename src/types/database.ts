@@ -71,6 +71,25 @@ export type PwaRun = {
   start_reminder_sent_at: string | null;
   reminder_1d_sent_at: string | null;
   reminder_6h_sent_at: string | null;
+  route_id: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+export type PwaRoute = {
+  id: string;
+  creator_id: string;
+  title: string;
+  distance_m: number;
+  elevation_gain_m: number | null;
+  geometry: {
+    type: "LineString";
+    coordinates: [number, number][];
+  };
+  waypoints: Array<{ lat: number; lng: number }>;
+  prefs: Record<string, unknown> | null;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

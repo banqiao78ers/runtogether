@@ -7,6 +7,8 @@ export type RouteDraft = {
   distance_km: number;
   destination?: string;
   waypoint_count?: number;
+  route_id?: string;
+  title?: string;
 };
 
 export const ROUTE_DRAFT_KEY = "routeDraft";

@@ -62,6 +62,9 @@ const API_ERROR_ZH: Record<string, string> = {
   ROUTING_UPSTREAM: "路線服務暫時無法使用",
   ROUTING_TIMEOUT: "路線計算逾時，請稍後再試",
   ROUTING_FAILED: "找不到可行走路線，請調整途經點",
+  TITLE_TOO_LONG: "路線名稱過長（最多 100 字）",
+  DISTANCE_REQUIRED: "請先完成路線距離計算",
+  GEOMETRY_REQUIRED: "缺少路線軌跡，請再點兩個點以上",
 };
 
 export function apiErrorMessage(code: unknown, fallback = "操作失敗"): string {

@@ -10,7 +10,7 @@
 
 ## 上線前必做
 
-1. 在 Supabase SQL Editor 依序執行 [`001_pwa_schema.sql`](./supabase/migrations/001_pwa_schema.sql)、[`002_host_follows.sql`](./supabase/migrations/002_host_follows.sql)、[`003_run_reminders.sql`](./supabase/migrations/003_run_reminders.sql)（已執行過的可略過）
+1. 在 Supabase SQL Editor 依序執行 [`001_pwa_schema.sql`](./supabase/migrations/001_pwa_schema.sql)、[`002_host_follows.sql`](./supabase/migrations/002_host_follows.sql)、[`003_run_reminders.sql`](./supabase/migrations/003_run_reminders.sql)、以及後續 migration（含 [`006_pwa_routes.sql`](./supabase/migrations/006_pwa_routes.sql) 路線儲存）（已執行過的可略過）
 2. 複製 `.env.example` → `.env.local`（與 Vercel Environment Variables）填入金鑰
 3. 第一位 admin：於 DB 手動 `UPDATE pwa_users SET role='admin' WHERE ...`，之後可用後台升格
 4. 舊會員升格採**規則 C**：對照 `profiles` 顯示名稱，於 `/admin/users` 手動設為 `super_member`
@@ -58,3 +58,5 @@ npm run dev
 ## 路線規劃（選用 env）
 
 預設免金鑰：OSM raster 底圖 + 公開 OSRM foot + Nominatim。不需申請地圖 API Key。可選設 `NEXT_PUBLIC_MAP_STYLE_URL` 改用 OpenFreeMap 向量底圖。正式環境流量大時建議自架路由。詳見 `.env.example` 與 `docs/route_planner_dev_plan.md`。
+
+路線儲存（需先執行 `006_pwa_routes.sql`）：規劃頁可填「名稱」後儲存，並用「歷史」重新開啟／刪除。
