@@ -6,13 +6,18 @@ import {
   Map as MapLibreMap,
   Marker,
   NavigationControl,
+  type GeoJSONSource,
   type MapMouseEvent,
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { LatLng, LineStringGeometry } from "@/lib/routing/types";
 
-/** 每次建圖都回傳新物件，避免 MapLibre 改壞共用 style 導致切頁後空白 */
+const SOURCE_ID = "bq-route-line";
+const LAYER_CASING = "bq-route-casing";
+const LAYER_LINE = "bq-route-line";
+
+/** 每次建圖新物件，避免 MapLibre 改壞共用 style */
 function buildOsmRasterStyle(): StyleSpecification {
   return {
     version: 8,
@@ -38,15 +43,11 @@ type Props = {
   flyTo?: LatLng | null;
   readOnly?: boolean;
   fitToRoute?: boolean;
-  /** Keep-Alive 顯示狀態：由 invisible→visible 時強制 resize／重繪 */
   visible?: boolean;
 };
 
-function waitForContainerSize(
-  el: HTMLElement,
-  timeoutMs = 3000,
-): Promise<{ w: number; h: number }> {
-  return new Promise((resolve) => {
+function waitForContainerSize(el: HTMLElement, timeoutMs = 3000) {
+  return new Promise<{ w: number; h: number }>((resolve) => {
     const ready = () => el.clientWidth > 0 && el.clientHeight > 0;
     if (ready()) {
       resolve({ w: el.clientWidth, h: el.clientHeight });
@@ -64,6 +65,17 @@ function waitForContainerSize(
       resolve({ w: el.clientWidth, h: el.clientHeight });
     }, timeoutMs);
   });
+}
+
+function emptyLineCollection() {
+  return {
+    type: "FeatureCollection" as const,
+    features: [] as Array<{
+      type: "Feature";
+      properties: { preview?: boolean };
+      geometry: LineStringGeometry;
+    }>,
+  };
 }
 
 export function RoutePlannerMap({
@@ -88,8 +100,6 @@ export function RoutePlannerMap({
   const fitDoneRef = useRef(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [pathD, setPathD] = useState("");
-  const [pathPreview, setPathPreview] = useState(false);
   const [remountKey, setRemountKey] = useState(0);
 
   onClickRef.current = onMapClick;
@@ -105,51 +115,126 @@ export function RoutePlannerMap({
     return waypointsRef.current;
   }, []);
 
-  const redrawPath = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) {
-      setPathD("");
-      return;
+  const ensureRouteLayer = useCallback((map: MapLibreMap) => {
+    if (!map.getSource(SOURCE_ID)) {
+      map.addSource(SOURCE_ID, {
+        type: "geojson",
+        data: emptyLineCollection(),
+      });
     }
-    const pts = routePoints();
-    if (pts.length < 2) {
-      setPathD("");
-      setPathPreview(false);
-      return;
+    if (!map.getLayer(LAYER_CASING)) {
+      map.addLayer({
+        id: LAYER_CASING,
+        type: "line",
+        source: SOURCE_ID,
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": "#042f2e",
+          "line-width": 8,
+          "line-opacity": 0.35,
+        },
+      });
     }
-    const g = geometryRef.current;
-    setPathPreview(!(g && g.coordinates.length >= 2));
+    if (!map.getLayer(LAYER_LINE)) {
+      map.addLayer({
+        id: LAYER_LINE,
+        type: "line",
+        source: SOURCE_ID,
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": "#34d399",
+          "line-width": 5,
+          "line-opacity": 0.95,
+        },
+      });
+    }
+  }, []);
 
-    const projected = pts.map((p) => map.project([p.lng, p.lat]));
-    const d = projected
-      .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-      .join(" ");
-    setPathD(d);
-  }, [routePoints]);
+  const syncRoute = useCallback(
+    (map: MapLibreMap) => {
+      ensureRouteLayer(map);
+      const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+      if (!src) return;
+
+      const g = geometryRef.current;
+      const isPreview = !(g && g.coordinates.length >= 2);
+      try {
+        if (isPreview) {
+          map.setPaintProperty(LAYER_LINE, "line-dasharray", [2, 1.5]);
+        } else {
+          map.setPaintProperty(LAYER_LINE, "line-dasharray", [1, 0]);
+        }
+      } catch {
+        // layer 尚未就緒
+      }
+
+      if (g && g.coordinates.length >= 2) {
+        src.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: g,
+            },
+          ],
+        });
+        return;
+      }
+
+      const pts = waypointsRef.current;
+      if (pts.length >= 2) {
+        src.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: {
+                type: "LineString",
+                coordinates: pts.map((p) => [p.lng, p.lat]),
+              },
+            },
+          ],
+        });
+        return;
+      }
+
+      src.setData(emptyLineCollection());
+    },
+    [ensureRouteLayer],
+  );
 
   const kickResize = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     try {
       map.resize();
+      map.dragPan.enable();
+      map.touchZoomRotate.enable();
+      map.dragRotate.disable();
+      map.touchPitch.disable();
       map.triggerRepaint();
     } catch {
       // ignore
     }
-    redrawPath();
-  }, [redrawPath]);
+  }, []);
 
-  // Keep-Alive 再次顯示時強制重繪（解決切 BottomNav 後白屏）
   useEffect(() => {
     if (!visible) return;
     kickResize();
-    const timers = [0, 50, 150, 400, 800].map((ms) =>
+    const map = mapRef.current;
+    if (map?.isStyleLoaded()) {
+      syncRoute(map);
+      syncMarkers(map);
+    }
+    const timers = [0, 50, 150, 400].map((ms) =>
       window.setTimeout(kickResize, ms),
     );
     return () => {
       for (const t of timers) window.clearTimeout(t);
     };
-  }, [visible, kickResize]);
+  }, [visible, kickResize, syncRoute]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -167,7 +252,9 @@ export function RoutePlannerMap({
       await waitForContainerSize(el);
       if (cancelled || !containerRef.current) return;
 
-      // 一律 OSM raster：向量 OpenFreeMap 在 PWA 切頁後常白屏
+      // 清空殘留 DOM（Keep-Alive／重載）
+      containerRef.current.replaceChildren();
+
       map = new MapLibreMap({
         container: containerRef.current,
         style: buildOsmRasterStyle(),
@@ -175,8 +262,14 @@ export function RoutePlannerMap({
         zoom,
         attributionControl: { compact: true },
         fadeDuration: 0,
+        dragPan: true,
+        touchZoomRotate: true,
+        dragRotate: false,
+        pitchWithRotate: false,
       });
       mapRef.current = map;
+      map.dragRotate.disable();
+      map.touchPitch.disable();
 
       map.addControl(new NavigationControl({ showCompass: false }), "top-right");
       if (!readOnly) {
@@ -192,15 +285,15 @@ export function RoutePlannerMap({
       const afterReady = () => {
         if (cancelled || !map) return;
         setMapError(null);
+        ensureRouteLayer(map);
+        syncRoute(map);
         syncMarkers(map);
         kickResize();
         if (fitToRoute) fitRouteBounds(map);
         timers.push(
           window.setTimeout(kickResize, 0),
-          window.setTimeout(kickResize, 50),
-          window.setTimeout(kickResize, 200),
-          window.setTimeout(kickResize, 500),
-          window.setTimeout(kickResize, 1000),
+          window.setTimeout(kickResize, 100),
+          window.setTimeout(kickResize, 400),
         );
       };
 
@@ -211,9 +304,6 @@ export function RoutePlannerMap({
           kickResize();
         }
       });
-      map.on("move", redrawPath);
-      map.on("zoom", redrawPath);
-      map.on("resize", redrawPath);
 
       map.on("error", (e) => {
         const msg = e.error?.message ?? "地圖載入失敗";
@@ -225,6 +315,7 @@ export function RoutePlannerMap({
 
       map.on("click", (e: MapMouseEvent) => {
         if (readOnlyRef.current) return;
+        // 避免拖曳誤觸：只有沒有拖移時才加點（簡易判斷）
         onClickRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
       });
 
@@ -235,35 +326,24 @@ export function RoutePlannerMap({
       );
     })();
 
-    const ro = new ResizeObserver(() => {
-      kickResize();
-    });
+    const ro = new ResizeObserver(() => kickResize());
     ro.observe(el);
     if (wrapRef.current) ro.observe(wrapRef.current);
 
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        kickResize();
-        requestAnimationFrame(kickResize);
-      }
+    const onVisibleDoc = () => {
+      if (document.visibilityState === "visible") kickResize();
     };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("pageshow", onVisible);
+    document.addEventListener("visibilitychange", onVisibleDoc);
 
     return () => {
       cancelled = true;
       for (const t of timers) window.clearTimeout(t);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("pageshow", onVisible);
+      document.removeEventListener("visibilitychange", onVisibleDoc);
       ro.disconnect();
       clearMarkers(markersRef);
-      if (map) {
-        map.remove();
-      }
+      if (map) map.remove();
       mapRef.current = null;
-      setPathD("");
     };
-    // remountKey：使用者手動重載；其餘只在掛載時建圖
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remountKey]);
 
@@ -278,13 +358,11 @@ export function RoutePlannerMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !map.isStyleLoaded()) return;
+    syncRoute(map);
     syncMarkers(map);
-    redrawPath();
-    if (fitToRoute && !fitDoneRef.current) {
-      fitRouteBounds(map);
-    }
-  }, [waypoints, geometry, redrawPath, fitToRoute]);
+    if (fitToRoute && !fitDoneRef.current) fitRouteBounds(map);
+  }, [waypoints, geometry, syncRoute, fitToRoute]);
 
   function fitRouteBounds(map: MapLibreMap) {
     const pts = routePoints();
@@ -315,7 +393,6 @@ export function RoutePlannerMap({
       { padding: 56, maxZoom: 16, duration: 0 },
     );
     fitDoneRef.current = true;
-    requestAnimationFrame(() => redrawPath());
   }
 
   function syncMarkers(map: MapLibreMap) {
@@ -351,42 +428,12 @@ export function RoutePlannerMap({
     >
       <div
         ref={containerRef}
-        className={`absolute inset-0 h-full w-full [&_.maplibregl-canvas]:outline-none [&_.maplibregl-ctrl-top-right]:top-3 [&_.maplibregl-ctrl-top-right]:right-2 [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90 ${
-          readOnly ? "cursor-grab" : "cursor-crosshair"
-        }`}
+        className="absolute inset-0 h-full w-full [&_.maplibregl-canvas]:outline-none [&_.maplibregl-canvas-container]:cursor-grab [&_.maplibregl-ctrl-top-right]:top-3 [&_.maplibregl-ctrl-top-right]:right-2 [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90"
         role="application"
         aria-label={
           readOnly ? "路線分享地圖" : "路線規劃地圖，點擊設定起點與途經點"
         }
       />
-      <svg
-        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
-        aria-hidden
-      >
-        {pathD ? (
-          <>
-            <path
-              d={pathD}
-              fill="none"
-              stroke="#042f2e"
-              strokeWidth={8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={0.35}
-            />
-            <path
-              d={pathD}
-              fill="none"
-              stroke="#34d399"
-              strokeWidth={5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={pathPreview ? "8 6" : undefined}
-              opacity={0.95}
-            />
-          </>
-        ) : null}
-      </svg>
       {!mapReady && !mapError && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[#1a2e24]/55">
           <p className="rounded-lg bg-[#0c1812]/90 px-3 py-2 text-sm text-emerald-100/80">
@@ -394,13 +441,9 @@ export function RoutePlannerMap({
           </p>
         </div>
       )}
-      {(mapError || (mapReady && !pathD && waypoints.length === 0)) && (
-        <div className="absolute inset-x-3 bottom-3 z-10 flex flex-col items-stretch gap-2">
-          {mapError && (
-            <p className="rounded-lg bg-amber-950/90 px-3 py-2 text-xs text-amber-100">
-              地圖載入失敗：{mapError}
-            </p>
-          )}
+      {mapError && (
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 rounded-lg bg-amber-950/90 px-3 py-2 text-xs text-amber-100">
+          地圖載入失敗：{mapError}
         </div>
       )}
       {mapReady && (
@@ -427,6 +470,8 @@ function createPinElement(
 ): HTMLDivElement {
   const el = document.createElement("div");
   el.className = "bq-route-pin";
+  // 圖釘不攔截地圖拖曳
+  el.style.pointerEvents = "none";
   const label =
     kind === "start" ? "起" : kind === "end" ? "終" : String(index);
   const bg =

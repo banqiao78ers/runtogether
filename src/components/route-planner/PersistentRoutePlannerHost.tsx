@@ -31,6 +31,10 @@ export function PersistentRoutePlannerHost() {
       aria-hidden={!active}
       data-route-planner-active={active ? "1" : "0"}
     >
+      {/*
+        inactive 用 invisible（維持尺寸）+ pointer-events-none（不擋下方頁）。
+        軌跡改畫在 MapLibre 圖層，不再用全螢幕 SVG，以免吃掉觸控拖曳。
+      */}
       <RoutePlanner mapVisible={active} />
     </div>
   );
