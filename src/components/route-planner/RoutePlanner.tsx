@@ -228,7 +228,7 @@ export function RoutePlanner() {
           : null;
 
   return (
-    <div className="relative flex h-[calc(100dvh-4rem)] flex-col">
+    <div className="relative flex h-[calc(100dvh-4rem)] min-h-[480px] flex-col">
       <div className="absolute inset-x-0 top-0 z-20 flex flex-col gap-2 p-3">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -287,14 +287,16 @@ export function RoutePlanner() {
         )}
       </div>
 
-      <div className="min-h-0 flex-1">
-        <RoutePlannerMap
-          center={center}
-          waypoints={waypoints}
-          geometry={geometry}
-          onMapClick={addWaypoint}
-          flyTo={flyTo}
-        />
+      <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-0">
+          <RoutePlannerMap
+            center={center}
+            waypoints={waypoints}
+            geometry={geometry}
+            onMapClick={addWaypoint}
+            flyTo={flyTo}
+          />
+        </div>
       </div>
 
       <div className="z-20 border-t border-emerald-900/50 bg-[#0c1812]/98 px-3 pb-3 pt-2 backdrop-blur">

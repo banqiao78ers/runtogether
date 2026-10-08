@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   GeolocateControl,
   Map as MapLibreMap,
   NavigationControl,
   type GeoJSONSource,
   type MapMouseEvent,
+  type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { LatLng, LineStringGeometry } from "@/lib/routing/types";
@@ -14,6 +15,22 @@ import type { LatLng, LineStringGeometry } from "@/lib/routing/types";
 const STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL ||
   "https://tiles.openfreemap.org/styles/liberty";
+
+/** 向量圖磚失敗時改用 raster，確保至少能看到地圖 */
+const RASTER_FALLBACK_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: [
+        "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors © CARTO",
+    },
+  },
+  layers: [{ id: "osm", type: "raster", source: "osm" }],
+};
 
 const SOURCE_ID = "route-line";
 const LAYER_ID = "route-line-layer";
@@ -40,13 +57,19 @@ export function RoutePlannerMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const onClickRef = useRef(onMapClick);
+  const layersReadyRef = useRef(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   onClickRef.current = onMapClick;
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    const el = containerRef.current;
+    if (!el || mapRef.current) return;
+
+    let cancelled = false;
+    let usingFallback = false;
 
     const map = new MapLibreMap({
-      container: containerRef.current,
+      container: el,
       style: STYLE_URL,
       center: [center.lng, center.lat],
       zoom,
@@ -62,38 +85,67 @@ export function RoutePlannerMap({
       "top-right",
     );
 
-    map.on("load", () => {
-      map.addSource(SOURCE_ID, {
-        type: "geojson",
-        data: emptyLine(),
-      });
-      map.addLayer({
-        id: LAYER_ID,
-        type: "line",
-        source: SOURCE_ID,
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: {
-          "line-color": "#34d399",
-          "line-width": 4.5,
-          "line-opacity": 0.9,
-        },
-      });
+    const ensureOverlayLayers = () => {
+      if (cancelled || layersReadyRef.current) return;
+      if (!map.getSource(SOURCE_ID)) {
+        map.addSource(SOURCE_ID, {
+          type: "geojson",
+          data: emptyLine(),
+        });
+        map.addLayer({
+          id: LAYER_ID,
+          type: "line",
+          source: SOURCE_ID,
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: {
+            "line-color": "#34d399",
+            "line-width": 4.5,
+            "line-opacity": 0.9,
+          },
+        });
+      }
+      if (!map.getSource(WP_SOURCE)) {
+        map.addSource(WP_SOURCE, {
+          type: "geojson",
+          data: emptyPoints(),
+        });
+        map.addLayer({
+          id: WP_LAYER,
+          type: "circle",
+          source: WP_SOURCE,
+          paint: {
+            "circle-radius": 7,
+            "circle-color": "#a7f3d0",
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#064e3b",
+          },
+        });
+      }
+      layersReadyRef.current = true;
+      map.resize();
+    };
 
-      map.addSource(WP_SOURCE, {
-        type: "geojson",
-        data: emptyPoints(),
-      });
-      map.addLayer({
-        id: WP_LAYER,
-        type: "circle",
-        source: WP_SOURCE,
-        paint: {
-          "circle-radius": 7,
-          "circle-color": "#a7f3d0",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#064e3b",
-        },
-      });
+    map.on("load", () => {
+      setMapError(null);
+      ensureOverlayLayers();
+    });
+
+    map.on("error", (e) => {
+      const msg = e.error?.message ?? "地圖載入失敗";
+      // 僅在 style 尚未載入時切換 raster（避免單張圖磚錯誤誤觸）
+      if (!usingFallback && !cancelled && !map.isStyleLoaded()) {
+        console.warn("[RoutePlannerMap] style failed, using raster fallback", msg);
+        usingFallback = true;
+        layersReadyRef.current = false;
+        setMapError(null);
+        map.setStyle(RASTER_FALLBACK_STYLE);
+        map.once("load", ensureOverlayLayers);
+        return;
+      }
+      if (!map.isStyleLoaded()) {
+        console.error("[RoutePlannerMap]", msg, e.error);
+        setMapError(msg);
+      }
     });
 
     map.on("click", (e: MapMouseEvent) => {
@@ -102,7 +154,19 @@ export function RoutePlannerMap({
 
     mapRef.current = map;
 
+    // flex 布局有時首幀高度為 0，需強制 resize
+    const ro = new ResizeObserver(() => {
+      map.resize();
+    });
+    ro.observe(el);
+    requestAnimationFrame(() => map.resize());
+    const t = window.setTimeout(() => map.resize(), 100);
+
     return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+      ro.disconnect();
+      layersReadyRef.current = false;
       map.remove();
       mapRef.current = null;
     };
@@ -112,7 +176,10 @@ export function RoutePlannerMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyTo) return;
-    map.flyTo({ center: [flyTo.lng, flyTo.lat], zoom: Math.max(map.getZoom(), 14) });
+    map.flyTo({
+      center: [flyTo.lng, flyTo.lat],
+      zoom: Math.max(map.getZoom(), 14),
+    });
   }, [flyTo]);
 
   useEffect(() => {
@@ -143,17 +210,29 @@ export function RoutePlannerMap({
       });
     };
 
-    if (map.isStyleLoaded()) apply();
-    else map.once("load", apply);
+    if (map.isStyleLoaded() && layersReadyRef.current) apply();
+    else {
+      map.once("load", () => {
+        // load 後 overlay 可能尚未加完，再等一幀
+        requestAnimationFrame(apply);
+      });
+    }
   }, [waypoints, geometry]);
 
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90"
-      role="application"
-      aria-label="路線規劃地圖，點擊新增途經點"
-    />
+    <div className="relative h-full w-full min-h-[240px]">
+      <div
+        ref={containerRef}
+        className="absolute inset-0 h-full w-full [&_.maplibregl-canvas]:outline-none [&_.maplibregl-ctrl-group]:overflow-hidden [&_.maplibregl-ctrl-group]:rounded-lg [&_.maplibregl-ctrl-group]:border [&_.maplibregl-ctrl-group]:border-emerald-800/40 [&_.maplibregl-ctrl-group]:bg-[#0c1812]/90"
+        role="application"
+        aria-label="路線規劃地圖，點擊新增途經點"
+      />
+      {mapError && (
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 rounded-lg bg-amber-950/90 px-3 py-2 text-xs text-amber-100">
+          地圖載入失敗：{mapError}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -161,7 +240,10 @@ function emptyLine() {
   return {
     type: "Feature" as const,
     properties: {},
-    geometry: { type: "LineString" as const, coordinates: [] as [number, number][] },
+    geometry: {
+      type: "LineString" as const,
+      coordinates: [] as [number, number][],
+    },
   };
 }
 
