@@ -58,7 +58,7 @@ npm run dev
 
 ## 路線規劃（選用 env）
 
-預設免金鑰：OSM raster 底圖 + 公開 OSRM foot + Nominatim。不需申請地圖 API Key。可選設 `NEXT_PUBLIC_MAP_STYLE_URL` 改用 OpenFreeMap 向量底圖。正式環境流量大時建議自架路由。詳見 `.env.example` 與 `docs/route_planner_dev_plan.md`。
+預設免金鑰：OSM raster 底圖 + 公開 OSRM foot + Nominatim。不需申請地圖 API Key。規劃頁地圖採 Keep-Alive，切換 BottomNav 不卸載以避免白屏。正式環境流量大時建議自架路由。詳見 `.env.example` 與 `docs/route_planner_dev_plan.md`。
 
 路線儲存（需先執行 `006_pwa_routes.sql`）：規劃頁可填「名稱」後儲存，並用「歷史」重新開啟／刪除；可「分享」產生公開地圖連結。
 

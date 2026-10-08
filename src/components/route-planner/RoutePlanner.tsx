@@ -33,7 +33,7 @@ function shareUrlFor(routeId: string) {
   return `${window.location.origin}/routes/share/${routeId}`;
 }
 
-export function RoutePlanner() {
+export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
   const router = useRouter();
   const [center, setCenter] = useState(DEFAULT_CENTER);
   const [flyTo, setFlyTo] = useState<LatLng | null>(null);
@@ -532,7 +532,7 @@ export function RoutePlanner() {
           : null;
 
   return (
-    <div className="relative flex h-[calc(100dvh-4rem)] min-h-[480px] flex-col">
+    <div className="relative flex h-full min-h-[480px] flex-col">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 p-3 pr-14">
         <div className="pointer-events-auto max-w-[calc(100%-0.5rem)]">
           <div className="flex flex-wrap items-center gap-2">
@@ -663,6 +663,7 @@ export function RoutePlanner() {
             geometry={geometry}
             onMapClick={addWaypoint}
             flyTo={flyTo}
+            visible={mapVisible}
           />
         </div>
       </div>

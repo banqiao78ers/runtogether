@@ -29,8 +29,6 @@ function buildOsmRasterStyle(): StyleSpecification {
   };
 }
 
-const CUSTOM_STYLE_URL = process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || "";
-
 type Props = {
   center: LatLng;
   zoom?: number;
@@ -40,6 +38,8 @@ type Props = {
   flyTo?: LatLng | null;
   readOnly?: boolean;
   fitToRoute?: boolean;
+  /** Keep-Alive 顯示狀態：由 invisible→visible 時強制 resize／重繪 */
+  visible?: boolean;
 };
 
 function waitForContainerSize(
@@ -75,6 +75,7 @@ export function RoutePlannerMap({
   flyTo,
   readOnly = false,
   fitToRoute = false,
+  visible = true,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -129,16 +130,32 @@ export function RoutePlannerMap({
   const kickResize = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.resize();
+    try {
+      map.resize();
+      map.triggerRepaint();
+    } catch {
+      // ignore
+    }
     redrawPath();
   }, [redrawPath]);
+
+  // Keep-Alive 再次顯示時強制重繪（解決切 BottomNav 後白屏）
+  useEffect(() => {
+    if (!visible) return;
+    kickResize();
+    const timers = [0, 50, 150, 400, 800].map((ms) =>
+      window.setTimeout(kickResize, ms),
+    );
+    return () => {
+      for (const t of timers) window.clearTimeout(t);
+    };
+  }, [visible, kickResize]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     let cancelled = false;
-    let fellBack = false;
     let map: MapLibreMap | null = null;
     const timers: number[] = [];
 
@@ -150,13 +167,10 @@ export function RoutePlannerMap({
       await waitForContainerSize(el);
       if (cancelled || !containerRef.current) return;
 
-      const initialStyle: string | StyleSpecification = CUSTOM_STYLE_URL
-        ? CUSTOM_STYLE_URL
-        : buildOsmRasterStyle();
-
+      // 一律 OSM raster：向量 OpenFreeMap 在 PWA 切頁後常白屏
       map = new MapLibreMap({
         container: containerRef.current,
-        style: initialStyle,
+        style: buildOsmRasterStyle(),
         center: [center.lng, center.lat],
         zoom,
         attributionControl: { compact: true },
@@ -181,7 +195,6 @@ export function RoutePlannerMap({
         syncMarkers(map);
         kickResize();
         if (fitToRoute) fitRouteBounds(map);
-        // 切頁回來時常需多踢幾次 resize，否則 canvas 維持 0×0
         timers.push(
           window.setTimeout(kickResize, 0),
           window.setTimeout(kickResize, 50),
@@ -204,20 +217,6 @@ export function RoutePlannerMap({
 
       map.on("error", (e) => {
         const msg = e.error?.message ?? "地圖載入失敗";
-        if (
-          CUSTOM_STYLE_URL &&
-          !fellBack &&
-          !cancelled &&
-          map &&
-          !map.isStyleLoaded()
-        ) {
-          console.warn("[RoutePlannerMap] custom style failed, OSM raster", msg);
-          fellBack = true;
-          setMapError(null);
-          setMapReady(false);
-          map.setStyle(buildOsmRasterStyle());
-          return;
-        }
         if (map && !map.isStyleLoaded()) {
           console.error("[RoutePlannerMap]", msg, e.error);
           setMapError(msg);
