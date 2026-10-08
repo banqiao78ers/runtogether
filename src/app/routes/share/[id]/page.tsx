@@ -20,7 +20,8 @@ export default async function SharedRoutePage({ params }: Props) {
   const { id } = await params;
   return (
     // 取消 layout 的 pb-16（分享頁隱藏 BottomNav）
-    <main className="-mb-16 flex h-[100dvh] flex-col">
+    // z-40：蓋過 Keep-Alive 規劃地圖層（inactive 時仍可能佔位）
+    <main className="relative z-40 -mb-16 flex h-[100dvh] flex-col bg-[#0f1f17]">
       <SharedRouteView routeId={id} />
     </main>
   );

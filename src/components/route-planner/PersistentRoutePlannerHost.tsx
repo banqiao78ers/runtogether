@@ -23,18 +23,15 @@ export function PersistentRoutePlannerHost() {
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 bottom-14 z-30 mx-auto flex w-full max-w-lg flex-col overflow-hidden bg-[#0f1f17] ${
+      className={`fixed inset-x-0 top-0 bottom-14 mx-auto flex w-full max-w-lg flex-col overflow-hidden bg-[#0f1f17] ${
         active
-          ? "visible pointer-events-auto"
-          : "invisible pointer-events-none"
+          ? "z-30 visible pointer-events-auto"
+          : // 維持版面尺寸（避免回規劃頁白屏），但降到底層且不可見，避免蓋住分享頁
+            "z-0 invisible pointer-events-none"
       }`}
       aria-hidden={!active}
       data-route-planner-active={active ? "1" : "0"}
     >
-      {/*
-        inactive 用 invisible（維持尺寸）+ pointer-events-none（不擋下方頁）。
-        軌跡改畫在 MapLibre 圖層，不再用全螢幕 SVG，以免吃掉觸控拖曳。
-      */}
       <RoutePlanner mapVisible={active} />
     </div>
   );
