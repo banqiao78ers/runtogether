@@ -35,10 +35,19 @@ function shareUrlFor(routeId: string) {
   return `${window.location.origin}/routes/share/${routeId}`;
 }
 
+function initialMapCenter(): LatLng {
+  const saved = readLastMapView();
+  return saved ? { lat: saved.lat, lng: saved.lng } : DEFAULT_CENTER;
+}
+
+function initialMapZoom(): number {
+  return readLastMapView()?.zoom ?? 14;
+}
+
 export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
   const router = useRouter();
-  const [center, setCenter] = useState(DEFAULT_CENTER);
-  const [mapZoom, setMapZoom] = useState(14);
+  const [center, setCenter] = useState(initialMapCenter);
+  const [mapZoom, setMapZoom] = useState(initialMapZoom);
   const [flyTo, setFlyTo] = useState<(LatLng & { zoom?: number }) | null>(
     null,
   );
@@ -73,16 +82,16 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
   const distanceKm = metersToKm(distanceM);
   const remain = remainingLabel(distanceKm, targetKm);
 
-  // 優先還原上次地圖視窗；沒有才試 GPS；兩者皆無則留冷啟動中心
+  // 有上次視窗：直接用初始 center／zoom 建圖（不 fly，避免畫面跳動）
+  // 沒有紀錄才試 GPS；皆無則留冷啟動中心
   useEffect(() => {
     const saved = readLastMapView();
     if (saved) {
-      const p = { lat: saved.lat, lng: saved.lng };
-      setCenter(p);
-      setMapZoom(saved.zoom);
-      setFlyTo({ ...p, zoom: saved.zoom });
       setLocateStatus("granted");
-      preloadOsmTiles(p, { zoom: Math.round(saved.zoom), radius: 1 });
+      preloadOsmTiles(
+        { lat: saved.lat, lng: saved.lng },
+        { zoom: Math.round(saved.zoom), radius: 1 },
+      );
       return;
     }
 
@@ -98,7 +107,7 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCenter(p);
-        setFlyTo(p);
+        setFlyTo({ ...p, zoom: 14 });
         setLocateStatus("granted");
         writeLastMapView({ ...p, zoom: 14 });
         preloadOsmTiles(p, { zoom: 14, radius: 1 });

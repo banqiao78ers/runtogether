@@ -17,6 +17,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { buildOsmRasterStyle } from "@/lib/routing/map-style";
+import { ensureMapLibreWorker } from "@/lib/routing/maplibre-worker";
 import type { LatLng, LineStringGeometry } from "@/lib/routing/types";
 
 const SOURCE_ID = "bq-route-line";
@@ -298,6 +299,8 @@ export function RoutePlannerMap({
 
       containerRef.current.replaceChildren();
 
+      ensureMapLibreWorker();
+
       map = new MapLibreMap({
         container: containerRef.current,
         style: buildOsmRasterStyle(),
@@ -379,6 +382,14 @@ export function RoutePlannerMap({
           /\/\d+\/\d+\/\d+\.png/i.test(msg)
         ) {
           console.warn("[RoutePlannerMap] tile error", msg);
+          return;
+        }
+        // Worker／圖磚偶發錯誤不擋操作；僅在 style 完全起不來時提示
+        if (/Worker failed to load/i.test(msg)) {
+          console.error("[RoutePlannerMap] worker", msg);
+          setMapError(
+            "地圖引擎載入失敗，請強制重整。若持續發生請清除快取後重試。",
+          );
           return;
         }
         if (map && !map.isStyleLoaded()) {
