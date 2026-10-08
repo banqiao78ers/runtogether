@@ -11,6 +11,8 @@ import {
   DEFAULT_CENTER,
   ROUTE_DRAFT_KEY,
   TARGET_DISTANCES_KM,
+  readLastMapView,
+  writeLastMapView,
   type LatLng,
   type LineStringGeometry,
   type RouteDraft,
@@ -36,7 +38,10 @@ function shareUrlFor(routeId: string) {
 export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
   const router = useRouter();
   const [center, setCenter] = useState(DEFAULT_CENTER);
-  const [flyTo, setFlyTo] = useState<LatLng | null>(null);
+  const [mapZoom, setMapZoom] = useState(14);
+  const [flyTo, setFlyTo] = useState<(LatLng & { zoom?: number }) | null>(
+    null,
+  );
   const [waypoints, setWaypoints] = useState<LatLng[]>([]);
   const [geometry, setGeometry] = useState<LineStringGeometry | null>(null);
   const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
@@ -68,12 +73,21 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
   const distanceKm = metersToKm(distanceM);
   const remain = remainingLabel(distanceKm, targetKm);
 
-  // 進頁預載預設／定位附近圖磚
+  // 優先還原上次地圖視窗；沒有才試 GPS；兩者皆無則留冷啟動中心
   useEffect(() => {
-    preloadOsmTiles(DEFAULT_CENTER, { zoom: 14, radius: 1 });
-  }, []);
+    const saved = readLastMapView();
+    if (saved) {
+      const p = { lat: saved.lat, lng: saved.lng };
+      setCenter(p);
+      setMapZoom(saved.zoom);
+      setFlyTo({ ...p, zoom: saved.zoom });
+      setLocateStatus("granted");
+      preloadOsmTiles(p, { zoom: Math.round(saved.zoom), radius: 1 });
+      return;
+    }
 
-  useEffect(() => {
+    preloadOsmTiles(DEFAULT_CENTER, { zoom: 14, radius: 1 });
+
     if (!navigator.geolocation) {
       setLocateStatus("unavailable");
       setShowSearch(true);
@@ -86,6 +100,7 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
         setCenter(p);
         setFlyTo(p);
         setLocateStatus("granted");
+        writeLastMapView({ ...p, zoom: 14 });
         preloadOsmTiles(p, { zoom: 14, radius: 1 });
         preloadOsmTiles(p, { zoom: 15, radius: 1 });
       },
@@ -659,9 +674,15 @@ export function RoutePlanner({ mapVisible = true }: { mapVisible?: boolean }) {
         <div className="absolute inset-0">
           <RoutePlannerMap
             center={center}
+            zoom={mapZoom}
             waypoints={waypoints}
             geometry={geometry}
             onMapClick={addWaypoint}
+            onViewChange={(view) => {
+              setCenter({ lat: view.lat, lng: view.lng });
+              setMapZoom(view.zoom);
+              writeLastMapView(view);
+            }}
             flyTo={flyTo}
             visible={mapVisible}
           />

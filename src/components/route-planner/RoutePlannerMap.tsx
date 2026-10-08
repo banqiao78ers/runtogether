@@ -23,13 +23,17 @@ const SOURCE_ID = "bq-route-line";
 const LAYER_CASING = "bq-route-casing";
 const LAYER_LINE = "bq-route-line";
 
+type MapViewChange = LatLng & { zoom: number };
+
 type Props = {
   center: LatLng;
   zoom?: number;
   waypoints: LatLng[];
   geometry: LineStringGeometry | null;
   onMapClick?: (point: LatLng) => void;
-  flyTo?: LatLng | null;
+  onViewChange?: (view: MapViewChange) => void;
+  /** 可帶 zoom；未帶則至少維持目前縮放（下限 14） */
+  flyTo?: (LatLng & { zoom?: number }) | null;
   readOnly?: boolean;
   fitToRoute?: boolean;
   visible?: boolean;
@@ -65,6 +69,7 @@ export function RoutePlannerMap({
   waypoints,
   geometry,
   onMapClick,
+  onViewChange,
   flyTo,
   readOnly = false,
   fitToRoute = false,
@@ -75,16 +80,19 @@ export function RoutePlannerMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const onClickRef = useRef(onMapClick);
+  const onViewChangeRef = useRef(onViewChange);
   const waypointsRef = useRef(waypoints);
   const geometryRef = useRef(geometry);
   const readOnlyRef = useRef(readOnly);
   const fitDoneRef = useRef(false);
   const dragMovedRef = useRef(false);
+  const viewSaveTimer = useRef<number | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [remountKey, setRemountKey] = useState(0);
 
   onClickRef.current = onMapClick;
+  onViewChangeRef.current = onViewChange;
   waypointsRef.current = waypoints;
   geometryRef.current = geometry;
   readOnlyRef.current = readOnly;
@@ -347,6 +355,18 @@ export function RoutePlannerMap({
         dragMovedRef.current = false;
       });
 
+      const emitView = () => {
+        if (!map || readOnlyRef.current) return;
+        const c = map.getCenter();
+        const z = map.getZoom();
+        if (viewSaveTimer.current) window.clearTimeout(viewSaveTimer.current);
+        viewSaveTimer.current = window.setTimeout(() => {
+          onViewChangeRef.current?.({ lat: c.lat, lng: c.lng, zoom: z });
+        }, 300);
+      };
+      map.on("moveend", emitView);
+      map.on("zoomend", emitView);
+
       map.on("click", (e: MapMouseEvent) => {
         if (readOnlyRef.current || dragMovedRef.current) return;
         onClickRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
@@ -380,6 +400,7 @@ export function RoutePlannerMap({
     return () => {
       cancelled = true;
       for (const t of timers) window.clearTimeout(t);
+      if (viewSaveTimer.current) window.clearTimeout(viewSaveTimer.current);
       ro.disconnect();
       for (const m of markersRef.current) m.remove();
       markersRef.current = [];
@@ -394,7 +415,10 @@ export function RoutePlannerMap({
     if (!map || !flyTo) return;
     map.flyTo({
       center: [flyTo.lng, flyTo.lat],
-      zoom: Math.max(map.getZoom(), 14),
+      zoom:
+        typeof flyTo.zoom === "number"
+          ? flyTo.zoom
+          : Math.max(map.getZoom(), 14),
     });
   }, [flyTo]);
 
