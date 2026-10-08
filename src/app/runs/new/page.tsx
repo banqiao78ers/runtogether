@@ -8,10 +8,18 @@ import { PaceSelect } from "@/components/PaceSelect";
 import { canUseCustomLocation } from "@/lib/rbac";
 import { apiErrorMessage } from "@/lib/api-errors";
 import { snapPaceToStep, UNLIMITED_PARTICIPANTS } from "@/lib/format";
+import { formatKm, metersToKm } from "@/lib/routing/format";
 import { ROUTE_DRAFT_KEY, type RouteDraft } from "@/lib/routing/types";
 import type { PwaLocation, UserRole } from "@/types/database";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+type RouteListItem = {
+  id: string;
+  title: string;
+  distance_m: number;
+  created_at: string;
+};
 
 const CAPACITY_OPTIONS = [
   UNLIMITED_PARTICIPANTS,
@@ -34,8 +42,13 @@ function NewRunForm() {
     "/api/locations",
     fetcher,
   );
+  const { data: routesData } = useSWR<{ routes: RouteListItem[] }>(
+    meData && !meData.error ? "/api/routes" : null,
+    fetcher,
+  );
   const role = (meData?.role || "member") as UserRole;
   const allowCustom = canUseCustomLocation(role);
+  const myRoutes = routesData?.routes ?? [];
 
   const [locationId, setLocationId] = useState("");
   const [customLocation, setCustomLocation] = useState("");
@@ -51,6 +64,8 @@ function NewRunForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fromRoute, setFromRoute] = useState(false);
+  const [routeId, setRouteId] = useState("");
+  const [loadingRoute, setLoadingRoute] = useState(false);
 
   useEffect(() => {
     if (meData?.pace_min && meData?.pace_max) {
@@ -88,11 +103,59 @@ function NewRunForm() {
       setDestination(nextDestination);
       setFromRoute(true);
     }
+    if (draft?.route_id) {
+      setRouteId(draft.route_id);
+      setFromRoute(true);
+    }
   }, [searchParams]);
 
   const banqiaoLocations = (locData?.locations ?? []).filter(
     (l) => l.district === "\u677f\u6a4b\u5340" || allowCustom,
   );
+
+  async function applySavedRoute(id: string) {
+    if (!id) {
+      setRouteId("");
+      return;
+    }
+    setLoadingRoute(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/routes/${id}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(apiErrorMessage(json.error, "無法載入路線"));
+        return;
+      }
+      const route = json.route as {
+        id: string;
+        title: string;
+        distance_m: number;
+        waypoints?: Array<{ lat: number; lng: number }>;
+      };
+      const km = metersToKm(route.distance_m);
+      setRouteId(route.id);
+      setDistance(km);
+      setFromRoute(true);
+
+      const wps = Array.isArray(route.waypoints) ? route.waypoints : [];
+      const last = wps[wps.length - 1];
+      if (last) {
+        setDestination(
+          `路線「${route.title}」終點（${last.lat.toFixed(4)}, ${last.lng.toFixed(4)}）`,
+        );
+      } else {
+        setDestination(route.title);
+      }
+      if (!note.trim()) {
+        setNote(`路線：${route.title}（${formatKm(km)} km）`);
+      }
+    } catch {
+      setError("無法載入路線");
+    } finally {
+      setLoadingRoute(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,6 +182,7 @@ function NewRunForm() {
         pace_max: paceMax,
         max_participants: maxParticipants,
         note: note || null,
+        route_id: routeId || null,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -146,12 +210,38 @@ function NewRunForm() {
       </Link>
       {fromRoute && (
         <p className="mt-2 text-xs text-emerald-300/70">
-          已套用路線規劃的距離
-          {!allowCustom ? "（集合點仍請選板橋固定點）" : ""}
+          已套用路線距離
+          {routeId ? "（已綁定歷史路線）" : ""}
+          {!allowCustom ? "；集合點仍請選板橋固定點" : ""}
         </p>
       )}
 
       <form onSubmit={(e) => void submit(e)} className="mt-6 flex flex-col gap-4">
+        <label className="text-sm text-emerald-100/80">
+          載入我的歷史路線
+          <select
+            value={routeId}
+            onChange={(e) => void applySavedRoute(e.target.value)}
+            disabled={loadingRoute}
+            className="mt-1 w-full rounded-md border border-emerald-800/60 bg-[#0c1812] px-3 py-2"
+          >
+            <option value="">不使用／手動填距離</option>
+            {myRoutes.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title} · {formatKm(metersToKm(r.distance_m))} km
+              </option>
+            ))}
+          </select>
+        </label>
+        {myRoutes.length === 0 && (
+          <p className="text-xs text-emerald-100/40">
+            尚無已存路線，可先到「路線」規劃並儲存
+          </p>
+        )}
+        {loadingRoute && (
+          <p className="text-xs text-emerald-100/50">載入路線中…</p>
+        )}
+
         <label className="text-sm text-emerald-100/80">
           集合點
           <select

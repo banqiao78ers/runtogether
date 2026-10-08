@@ -15,6 +15,9 @@ function isPublicPath(pathname: string, method: string): boolean {
   if (method === "GET" && pathname === "/api/runs") return true;
   if (method === "GET" && /^\/api\/runs\/[^/]+$/.test(pathname)) return true;
   if (method === "GET" && pathname === "/api/locations") return true;
+  // 公開分享路線（地圖預覽）
+  if (method === "GET" && pathname.startsWith("/api/routes/share/")) return true;
+  if (pathname.startsWith("/routes/share/")) return true;
   if (pathname === "/" || pathname.startsWith("/runs/")) {
     if (pathname === "/runs/new") return false;
     return true;

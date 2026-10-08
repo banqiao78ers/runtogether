@@ -48,7 +48,8 @@ npm run dev
 | 路徑 | 說明 |
 |------|------|
 | `/` | 活動列表 |
-| `/routes/plan` | 路跑路線規劃（貼路、距離、GPX、套用開團） |
+| `/routes/plan` | 路跑路線規劃（貼路、距離、GPX、儲存／歷史、分享、套用開團） |
+| `/routes/share/[id]` | 公開分享路線地圖（免登入） |
 | `/runs/new` | 開團 |
 | `/runs/[id]` | 詳情／報名／留言 |
 | `/me` | 個人與推播 |
@@ -59,4 +60,6 @@ npm run dev
 
 預設免金鑰：OSM raster 底圖 + 公開 OSRM foot + Nominatim。不需申請地圖 API Key。可選設 `NEXT_PUBLIC_MAP_STYLE_URL` 改用 OpenFreeMap 向量底圖。正式環境流量大時建議自架路由。詳見 `.env.example` 與 `docs/route_planner_dev_plan.md`。
 
-路線儲存（需先執行 `006_pwa_routes.sql`）：規劃頁可填「名稱」後儲存，並用「歷史」重新開啟／刪除。
+路線儲存（需先執行 `006_pwa_routes.sql`）：規劃頁可填「名稱」後儲存，並用「歷史」重新開啟／刪除；可「分享」產生公開地圖連結。
+
+地圖圖磚會由 Service Worker（`public/sw.js`）做 **Cache First** 暫存（約 800 張上限），切換頁面／重開規劃器時優先讀快取以節省流量。首次進站仍需下載圖磚；更新 SW 後請重新開啟 PWA 一次。

@@ -24,8 +24,14 @@ type RouteListItem = {
   id: string;
   title: string;
   distance_m: number;
+  is_public?: boolean;
   created_at: string;
 };
+
+function shareUrlFor(routeId: string) {
+  if (typeof window === "undefined") return `/routes/share/${routeId}`;
+  return `${window.location.origin}/routes/share/${routeId}`;
+}
 
 export function RoutePlanner() {
   const router = useRouter();
@@ -46,6 +52,7 @@ export function RoutePlanner() {
   const [routeTitle, setRouteTitle] = useState("");
   const [savedRouteId, setSavedRouteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<RouteListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -354,6 +361,131 @@ export function RoutePlanner() {
     }
   }
 
+  async function publishAndGetShareUrl(existingId?: string | null) {
+    const title = routeTitle.trim();
+    if (!title) {
+      setError("分享前請先填寫路線名稱");
+      return null;
+    }
+    const geom = currentGeometry();
+    if (!geom || waypoints.length < 2 || distanceM <= 0) {
+      setError("請先完成至少兩點的貼路路線再分享");
+      return null;
+    }
+
+    if (existingId) {
+      const res = await fetch(`/api/routes/${existingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_public: true, title }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(apiErrorMessage(json.error, "無法產生分享連結"));
+        return null;
+      }
+      setSavedRouteId(existingId);
+      return shareUrlFor(existingId);
+    }
+
+    const res = await fetch("/api/routes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        distance_m: distanceM,
+        geometry: geom,
+        waypoints,
+        is_public: true,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(apiErrorMessage(json.error, "無法產生分享連結"));
+      return null;
+    }
+    const id = json.route?.id as string | undefined;
+    if (!id) {
+      setError("無法產生分享連結");
+      return null;
+    }
+    setSavedRouteId(id);
+    return shareUrlFor(id);
+  }
+
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }
+  }
+
+  async function shareRoute(fromHistoryId?: string) {
+    setSharing(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const id = fromHistoryId ?? savedRouteId;
+      // 從歷史分享時若與當前編輯不是同一條，直接公開該 id
+      let url: string | null = null;
+      if (fromHistoryId) {
+        const res = await fetch(`/api/routes/${fromHistoryId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_public: true }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(apiErrorMessage(json.error, "無法產生分享連結"));
+          return;
+        }
+        url = shareUrlFor(fromHistoryId);
+      } else {
+        url = await publishAndGetShareUrl(id);
+      }
+      if (!url) return;
+
+      const title = routeTitle.trim() || "板橋約跑路線";
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({
+            title,
+            text: `${title} · 板橋約跑路線地圖`,
+            url,
+          });
+          setOkMsg("已開啟分享");
+          if (showHistory) void loadHistory();
+          return;
+        } catch (err) {
+          // 使用者取消分享 → 仍提供複製
+          if (err instanceof DOMException && err.name === "AbortError") {
+            setOkMsg("已取消分享");
+            return;
+          }
+        }
+      }
+
+      const copied = await copyText(url);
+      setOkMsg(copied ? "分享連結已複製" : `分享連結：${url}`);
+      if (showHistory) void loadHistory();
+    } catch {
+      setError("分享失敗，請稍後再試");
+    } finally {
+      setSharing(false);
+    }
+  }
+
   function applyToRun() {
     if (distanceKm <= 0 && waypoints.length < 2) {
       setError("請先規劃路線再套用到開團");
@@ -498,6 +630,13 @@ export function RoutePlanner() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => void shareRoute(r.id)}
+                    className="shrink-0 text-xs text-emerald-300/80"
+                  >
+                    分享
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => void deleteSavedRoute(r.id)}
                     className="shrink-0 text-xs text-amber-200/70"
                   >
@@ -625,7 +764,7 @@ export function RoutePlanner() {
         {error && <p className="mb-2 text-xs text-amber-300">{error}</p>}
         {okMsg && <p className="mb-2 text-xs text-emerald-300">{okMsg}</p>}
 
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           <button
             type="button"
             onClick={undo}
@@ -649,6 +788,15 @@ export function RoutePlanner() {
             className="h-11 rounded-lg border border-emerald-800/60 text-sm text-emerald-100 disabled:opacity-35"
           >
             GPX
+          </button>
+          <button
+            type="button"
+            onClick={() => void shareRoute()}
+            disabled={sharing || waypoints.length < 2 || distanceM <= 0}
+            className="h-11 rounded-lg border border-emerald-800/60 text-sm text-emerald-100 disabled:opacity-35"
+            title="產生公開地圖連結"
+          >
+            {sharing ? "…" : "分享"}
           </button>
           <button
             type="button"

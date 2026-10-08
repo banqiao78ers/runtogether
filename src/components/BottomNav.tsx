@@ -15,7 +15,8 @@ export function BottomNav() {
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/onboarding") ||
-    pathname.startsWith("/banned")
+    pathname.startsWith("/banned") ||
+    pathname.startsWith("/routes/share/")
   ) {
     return null;
   }

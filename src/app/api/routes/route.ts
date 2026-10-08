@@ -36,7 +36,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("pwa_routes")
       .select(
-        "id, title, distance_m, elevation_gain_m, created_at, updated_at",
+        "id, title, distance_m, elevation_gain_m, is_public, created_at, updated_at",
       )
       .eq("creator_id", user.id)
       .is("deleted_at", null)
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       geometry?: unknown;
       waypoints?: unknown;
       prefs?: unknown;
+      is_public?: boolean;
     };
 
     const title = body.title?.trim() ?? "";
@@ -93,9 +94,10 @@ export async function POST(request: Request) {
         geometry: body.geometry,
         waypoints: body.waypoints,
         prefs: body.prefs ?? null,
+        is_public: body.is_public === true,
       })
       .select(
-        "id, title, distance_m, elevation_gain_m, geometry, waypoints, created_at, updated_at",
+        "id, title, distance_m, elevation_gain_m, geometry, waypoints, is_public, created_at, updated_at",
       )
       .single();
 

@@ -76,6 +76,7 @@ export async function POST(request: Request) {
       pace_max: number;
       max_participants?: number;
       note?: string | null;
+      route_id?: string | null;
     };
 
     if (
@@ -152,6 +153,7 @@ export async function POST(request: Request) {
         pace_max: body.pace_max,
         max_participants: maxParticipants,
         note: body.note ?? null,
+        route_id: body.route_id || null,
         status: "open",
       })
       .select("*")
