@@ -12,25 +12,27 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { LatLng, LineStringGeometry } from "@/lib/routing/types";
 
-const STYLE_URL =
-  process.env.NEXT_PUBLIC_MAP_STYLE_URL ||
-  "https://tiles.openfreemap.org/styles/liberty";
-
-/** 向量圖磚失敗時改用 raster，確保至少能看到地圖 */
-const RASTER_FALLBACK_STYLE: StyleSpecification = {
+/**
+ * 預設用免金鑰 OSM raster（內嵌 style，不依賴第三方 style JSON／Carto）。
+ * 若要向量底圖可設 NEXT_PUBLIC_MAP_STYLE_URL=https://tiles.openfreemap.org/styles/liberty
+ */
+const FREE_OSM_RASTER_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     osm: {
       type: "raster",
       tiles: [
-        "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       ],
       tileSize: 256,
-      attribution: "© OpenStreetMap contributors © CARTO",
+      attribution: "© OpenStreetMap contributors",
+      maxzoom: 19,
     },
   },
   layers: [{ id: "osm", type: "raster", source: "osm" }],
 };
+
+const CUSTOM_STYLE_URL = process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || "";
 
 const SOURCE_ID = "route-line";
 const LAYER_ID = "route-line-layer";
@@ -66,11 +68,15 @@ export function RoutePlannerMap({
     if (!el || mapRef.current) return;
 
     let cancelled = false;
-    let usingFallback = false;
+    let fellBack = false;
+
+    const initialStyle: string | StyleSpecification = CUSTOM_STYLE_URL
+      ? CUSTOM_STYLE_URL
+      : FREE_OSM_RASTER_STYLE;
 
     const map = new MapLibreMap({
       container: el,
-      style: STYLE_URL,
+      style: initialStyle,
       center: [center.lng, center.lat],
       zoom,
       attributionControl: { compact: true },
@@ -132,13 +138,18 @@ export function RoutePlannerMap({
 
     map.on("error", (e) => {
       const msg = e.error?.message ?? "地圖載入失敗";
-      // 僅在 style 尚未載入時切換 raster（避免單張圖磚錯誤誤觸）
-      if (!usingFallback && !cancelled && !map.isStyleLoaded()) {
-        console.warn("[RoutePlannerMap] style failed, using raster fallback", msg);
-        usingFallback = true;
+      // 自訂向量 style 失敗 → 改回免金鑰 OSM raster（只一次）
+      if (
+        CUSTOM_STYLE_URL &&
+        !fellBack &&
+        !cancelled &&
+        !map.isStyleLoaded()
+      ) {
+        console.warn("[RoutePlannerMap] custom style failed, OSM raster", msg);
+        fellBack = true;
         layersReadyRef.current = false;
         setMapError(null);
-        map.setStyle(RASTER_FALLBACK_STYLE);
+        map.setStyle(FREE_OSM_RASTER_STYLE);
         map.once("load", ensureOverlayLayers);
         return;
       }
@@ -154,7 +165,6 @@ export function RoutePlannerMap({
 
     mapRef.current = map;
 
-    // flex 布局有時首幀高度為 0，需強制 resize
     const ro = new ResizeObserver(() => {
       map.resize();
     });
@@ -213,7 +223,6 @@ export function RoutePlannerMap({
     if (map.isStyleLoaded() && layersReadyRef.current) apply();
     else {
       map.once("load", () => {
-        // load 後 overlay 可能尚未加完，再等一幀
         requestAnimationFrame(apply);
       });
     }

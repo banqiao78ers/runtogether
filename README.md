@@ -57,4 +57,4 @@ npm run dev
 
 ## 路線規劃（選用 env）
 
-預設使用公開 OSRM foot（`routing.openstreetmap.de`）與 Nominatim、OpenFreeMap 圖磚，無需金鑰即可本機試用。正式環境建議自架或付費方案以避免 rate limit。詳見 `.env.example` 與 `docs/route_planner_dev_plan.md`。
+預設免金鑰：OSM raster 底圖 + 公開 OSRM foot + Nominatim。不需申請地圖 API Key。可選設 `NEXT_PUBLIC_MAP_STYLE_URL` 改用 OpenFreeMap 向量底圖。正式環境流量大時建議自架路由。詳見 `.env.example` 與 `docs/route_planner_dev_plan.md`。
