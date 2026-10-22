@@ -27,7 +27,7 @@ export type PushSubscriptionJSON = {
 
 export type PwaUser = {
   id: string;
-  line_uid: string;
+  line_uid: string | null;
   display_name: string;
   avatar_url: string | null;
   role: UserRole;
@@ -37,6 +37,20 @@ export type PwaUser = {
   push_subscription: PushSubscriptionJSON | null;
   created_at: string;
   updated_at: string;
+};
+
+export type InviteTokenPurpose = "register" | "login";
+
+export type PwaInviteToken = {
+  id: string;
+  token_hash: string;
+  purpose: InviteTokenPurpose;
+  user_id: string | null;
+  created_by: string;
+  expires_at: string;
+  used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
 };
 
 export type PwaLocation = {
@@ -156,7 +170,7 @@ export type LegacyProfile = {
 
 export type SessionPayload = {
   userId: string;
-  lineUid: string;
+  lineUid: string | null;
   role: UserRole;
 };
 

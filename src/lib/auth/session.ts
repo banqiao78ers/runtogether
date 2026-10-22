@@ -32,16 +32,15 @@ export async function verifySession(
 ): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getSecretKey());
-    if (
-      typeof payload.userId !== "string" ||
-      typeof payload.lineUid !== "string" ||
-      typeof payload.role !== "string"
-    ) {
+    if (typeof payload.userId !== "string" || typeof payload.role !== "string") {
+      return null;
+    }
+    if (payload.lineUid != null && typeof payload.lineUid !== "string") {
       return null;
     }
     return {
       userId: payload.userId,
-      lineUid: payload.lineUid,
+      lineUid: typeof payload.lineUid === "string" ? payload.lineUid : null,
       role: payload.role as UserRole,
     };
   } catch {

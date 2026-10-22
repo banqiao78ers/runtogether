@@ -15,7 +15,7 @@ export async function GET() {
         supabase
           .from("pwa_users")
           .select(
-            "id, display_name, avatar_url, role, is_banned, pace_min, pace_max, created_at",
+            "id, display_name, avatar_url, role, is_banned, pace_min, pace_max, created_at, line_uid",
           )
           .order("created_at", { ascending: false })
           .limit(200),
@@ -62,7 +62,7 @@ export async function PATCH(request: Request) {
       })
       .eq("id", body.id)
       .select(
-        "id, display_name, avatar_url, role, is_banned, pace_min, pace_max, created_at",
+        "id, display_name, avatar_url, role, is_banned, pace_min, pace_max, created_at, line_uid",
       )
       .single();
 

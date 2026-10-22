@@ -17,6 +17,7 @@
   * 首次登入時，後端即時比對既有系統舊會員表；命中者直接初始化為 `super_member`，未命中者為 `member`。
   * **登入容錯機制**：若比對舊會員表逾時或異常，直接阻斷登入並提示稍後重試，避免身分誤判。
   * **Session 管理**：採用長效 HttpOnly Cookie（30 天效期 + 每次活動自動滑動續期）。
+  * **邀請開通（無 LINE）**：Admin 於 `/admin/users` 產生單次邀請連結（`pwa_invite_tokens`，register／7 天）。對方於 `/invite/[token]` 僅填 LINE 群內顯示名稱即可建立 `pwa_users`（`line_uid` 可為 NULL、role=`member`）。公開登入頁不提供帳密；日常靠 Session。救援回登：Admin 對無 LINE 會員產生單次登入連結（login／24 小時）。Token 只存 SHA-256 hash，單次使用，可撤銷。
 * **推播機制 (Web Push API)**：
   * 獨立 VAPID Key 簽發，不與其他專案混用。
   * 單一裝置覆蓋制（Single Active Device），收到 `410 Gone` 回應時後端自動清空該用戶之 `push_subscription`。
@@ -35,6 +36,7 @@
 | **活動紀錄管理** | 無 | 無 | `/admin/runs` 檢視全站活動並可修改時間／地點／狀態／出席／軟刪除（一般主揪仍受開團後資訊鎖定） |
 | **留言管理權限** | 僅可刪除個人留言 | 僅可刪除個人留言（若為主揪可刪該團留言） | 可刪除全站任何留言 |
 | **停權申訴審核** | 僅被停權時可提交申訴 | 無 | 審核核准 / 駁回 |
+| **邀請／登入連結** | 無 | 無 | 產生邀請開通與無 LINE 會員登入連結、撤銷未使用 token |
 
 ---
 
@@ -82,7 +84,7 @@
 -- 1. 會員主表
 CREATE TABLE pwa_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  line_uid VARCHAR(64) NOT NULL UNIQUE,
+  line_uid VARCHAR(64) UNIQUE, -- 邀請開通者可為 NULL；非空值仍唯一
   display_name VARCHAR(100) NOT NULL,
   avatar_url TEXT,
   role VARCHAR(20) NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'super_member', 'admin')),
@@ -92,6 +94,22 @@ CREATE TABLE pwa_users (
   push_subscription JSONB, -- 單一裝置推播訂閱物件
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 1b. 邀請／魔法登入 token（只存 hash）
+CREATE TABLE pwa_invite_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_hash VARCHAR(64) NOT NULL UNIQUE,
+  purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('register', 'login')),
+  user_id UUID REFERENCES pwa_users(id) ON DELETE CASCADE,
+  created_by UUID NOT NULL REFERENCES pwa_users(id) ON DELETE RESTRICT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_invite_login_has_user CHECK (
+    purpose <> 'login' OR user_id IS NOT NULL
+  )
 );
 
 -- 2. 集合地點表 (後台管理)

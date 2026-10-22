@@ -65,6 +65,16 @@ const API_ERROR_ZH: Record<string, string> = {
   TITLE_TOO_LONG: "路線名稱過長（最多 100 字）",
   DISTANCE_REQUIRED: "請先完成路線距離計算",
   GEOMETRY_REQUIRED: "缺少路線軌跡，請再點兩個點以上",
+  DISPLAY_NAME_REQUIRED: "請填寫群內顯示名稱",
+  DISPLAY_NAME_TOO_LONG: "顯示名稱過長（最多 100 字）",
+  INVITE_NOT_FOUND: "邀請連結無效或不存在",
+  INVITE_EXPIRED: "邀請連結已過期，請向管理員重新索取",
+  INVITE_USED: "此連結已使用過",
+  INVITE_REVOKED: "此連結已被撤銷",
+  INVITE_NOT_REGISTER: "此連結不是註冊邀請",
+  INVITE_NOT_LOGIN: "此連結不是登入連結",
+  INVITE_NOT_REVOCABLE: "此連結無法撤銷（已使用或已撤銷）",
+  LOGIN_LINK_LINE_ONLY: "此會員已綁定 LINE，請使用 LINE 登入",
 };
 
 export function apiErrorMessage(code: unknown, fallback = "操作失敗"): string {

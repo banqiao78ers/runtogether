@@ -10,6 +10,8 @@ function isPublicPath(pathname: string, method: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
   if (pathname.startsWith("/icons/")) return true;
   if (pathname.startsWith("/api/auth/")) return true;
+  if (pathname.startsWith("/api/invite/")) return true;
+  if (pathname.startsWith("/invite/")) return true;
   if (pathname.startsWith("/api/cron/")) return true;
   if (method === "GET" && pathname === "/api/push/vapid-public") return true;
   if (method === "GET" && pathname === "/api/runs") return true;
